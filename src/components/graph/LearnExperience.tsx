@@ -12,6 +12,7 @@ import { signIn, signOut, useSession } from "next-auth/react";
 import {
   ArrowLeft,
   ArrowRight,
+  FolderKanban,
   Gauge,
   GraduationCap,
   LayoutGrid,
@@ -25,6 +26,9 @@ import GraphView, { type GraphStats } from "@/components/graph/GraphView";
 import LecturePanel, { type LectureProgress } from "@/components/graph/LecturePanel";
 import ChatPanel from "@/components/graph/ChatPanel";
 import AssessmentQuiz from "@/components/graph/AssessmentQuiz";
+import ProjectsPanel, {
+  type ProjectSummary,
+} from "@/components/graph/ProjectsPanel";
 import Progress from "@/components/ui/Progress";
 import { EXAMPLE_PROJECTS } from "@/lib/examples/projects";
 import styles from "./learn.module.css";
@@ -55,9 +59,9 @@ export default function LearnExperience() {
   const [starting, setStarting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [progress, setProgress] = useState<LectureProgress | null>(null);
-  const [mode, setMode] = useState<"workspace" | "assessment" | "lectures">(
-    "workspace",
-  );
+  const [mode, setMode] = useState<
+    "workspace" | "assessment" | "lectures" | "projects"
+  >("workspace");
   const [graphStats, setGraphStats] = useState<GraphStats | null>(null);
   const [autoStartLecture, setAutoStartLecture] = useState(false);
 
@@ -73,6 +77,29 @@ export default function LearnExperience() {
   }
 
   function backToGraph() {
+    setMode("workspace");
+  }
+
+  // Open one of the user's saved projects: load it into the workspace. The
+  // research stream replays the persisted graph for a known sessionId.
+  function openProject(project: ProjectSummary) {
+    setTopic(project.prompt || project.title);
+    setSessionId(project.id);
+    setProgress(null);
+    setGraphStats(null);
+    setAutoStartLecture(false);
+    setError(null);
+    setMode("workspace");
+  }
+
+  // "New project" from the projects tab: clear the workspace and focus the form.
+  function newProject() {
+    setTopic("");
+    setSessionId(null);
+    setProgress(null);
+    setGraphStats(null);
+    setAutoStartLecture(false);
+    setError(null);
     setMode("workspace");
   }
 
@@ -224,11 +251,23 @@ export default function LearnExperience() {
         <nav className={styles.sidebarNav} aria-label="Workspace">
           <button
             type="button"
-            className={mode === "lectures" ? styles.navItem : styles.navItemActive}
+            className={
+              mode === "lectures" || mode === "projects"
+                ? styles.navItem
+                : styles.navItemActive
+            }
             onClick={backToGraph}
           >
             <Network className={styles.navIcon} size={18} aria-hidden />
             Graph &amp; Chat
+          </button>
+          <button
+            type="button"
+            className={mode === "projects" ? styles.navItemActive : styles.navItem}
+            onClick={() => setMode("projects")}
+          >
+            <FolderKanban className={styles.navIcon} size={18} aria-hidden />
+            My Projects
           </button>
           <a className={styles.navItem} href="/examples">
             <LayoutGrid className={styles.navIcon} size={18} aria-hidden />
@@ -257,28 +296,36 @@ export default function LearnExperience() {
       <main className={styles.main}>
         <header className={styles.header}>
           <h1 className={styles.pageTitle}>
-            {mode === "lectures" ? "Lectures" : "Knowledge Graph"}
+            {mode === "lectures"
+              ? "Lectures"
+              : mode === "projects"
+                ? "My Projects"
+                : "Knowledge Graph"}
           </h1>
           <p className={styles.subtitle}>
-            Enter a topic and watch its prerequisite graph build itself, live.
+            {mode === "projects"
+              ? "Your saved research projects — reopen a graph or start a new one."
+              : "Enter a topic and watch its prerequisite graph build itself, live."}
           </p>
-          <form className={styles.form} onSubmit={start}>
-            <input
-              className={styles.input}
-              type="text"
-              value={topic}
-              placeholder="e.g. Diffusion models, Kalman filters, Byzantine consensus…"
-              onChange={(e) => setTopic(e.target.value)}
-              aria-label="Research topic"
-            />
-            <button className={styles.button} type="submit" disabled={starting}>
-              {starting ? "Starting…" : "Build the graph"}
-            </button>
-          </form>
+          {mode !== "projects" && (
+            <form className={styles.form} onSubmit={start}>
+              <input
+                className={styles.input}
+                type="text"
+                value={topic}
+                placeholder="e.g. Diffusion models, Kalman filters, Byzantine consensus…"
+                onChange={(e) => setTopic(e.target.value)}
+                aria-label="Research topic"
+              />
+              <button className={styles.button} type="submit" disabled={starting}>
+                {starting ? "Starting…" : "Build the graph"}
+              </button>
+            </form>
+          )}
           {error && <p className={styles.error}>{error}</p>}
         </header>
 
-        {researching && mode !== "lectures" && (
+        {researching && mode !== "lectures" && mode !== "projects" && (
           <div className={styles.researchBanner} role="status" aria-live="polite">
             <span className={styles.researchPulse} aria-hidden />
             <span className={styles.researchText}>
@@ -294,7 +341,11 @@ export default function LearnExperience() {
           </div>
         )}
 
-        {mode === "lectures" ? (
+        {mode === "projects" ? (
+          <div className={styles.panel}>
+            <ProjectsPanel onOpen={openProject} onNew={newProject} />
+          </div>
+        ) : mode === "lectures" ? (
           <div className={styles.panel}>
             <button type="button" className={styles.backToGraph} onClick={backToGraph}>
               <ArrowLeft size={15} aria-hidden /> Back to graph &amp; chat
