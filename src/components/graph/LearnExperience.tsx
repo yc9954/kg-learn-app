@@ -11,7 +11,27 @@ import { useState } from "react";
 import { signIn, signOut, useSession } from "next-auth/react";
 import GraphView from "@/components/graph/GraphView";
 import LecturePanel, { type LectureProgress } from "@/components/graph/LecturePanel";
+import { EXAMPLE_PROJECTS } from "@/lib/examples/projects";
 import styles from "./learn.module.css";
+
+const HOW_STEPS = [
+  {
+    title: "Enter a topic",
+    text: "Type anything. Research starts immediately and concepts begin appearing.",
+  },
+  {
+    title: "Graph grows live",
+    text: "A prerequisite graph builds itself over a streaming connection until it converges.",
+  },
+  {
+    title: "Level assessment",
+    text: "An adaptive quiz marks what you already know so lectures start at the right depth.",
+  },
+  {
+    title: "Ordered lectures",
+    text: "Lectures generate in topological order with zero forward references.",
+  },
+];
 
 export default function LearnExperience() {
   const { data: session, status } = useSession();
@@ -111,6 +131,44 @@ export default function LearnExperience() {
             </div>
           </section>
         </div>
+
+        <section className={styles.examples}>
+          <div className={styles.examplesHead}>
+            <h2 className={styles.examplesTitle}>Explore example projects</h2>
+            <p className={styles.examplesSub}>
+              Public samples — open any of them, no login required.
+            </p>
+          </div>
+          <div className={styles.exampleGrid}>
+            {EXAMPLE_PROJECTS.map((ex) => (
+              <a
+                key={ex.id}
+                className={styles.exampleCard}
+                href={`/examples/${ex.id}`}
+              >
+                <span className={styles.exampleType}>Knowledge graph</span>
+                <h3 className={styles.exampleCardTitle}>{ex.title}</h3>
+                <p className={styles.exampleBlurb}>{ex.blurb}</p>
+                <span className={styles.exampleMeta}>
+                  {ex.conceptCount} concepts · {ex.edges.length} links
+                </span>
+              </a>
+            ))}
+          </div>
+        </section>
+
+        <section className={styles.howItWorks}>
+          <h2 className={styles.examplesTitle}>How it works</h2>
+          <div className={styles.stepsGrid}>
+            {HOW_STEPS.map((step, i) => (
+              <article key={step.title} className={styles.stepCard}>
+                <span className={styles.stepNum}>{i + 1}</span>
+                <h3 className={styles.stepTitle}>{step.title}</h3>
+                <p className={styles.stepText}>{step.text}</p>
+              </article>
+            ))}
+          </div>
+        </section>
       </div>
     );
   }
@@ -140,9 +198,9 @@ export default function LearnExperience() {
             <span className={styles.navIcon}>▤</span>
             Lectures
           </button>
-          <a className={styles.navItem} href="/about">
+          <a className={styles.navItem} href="/examples/transformers">
             <span className={styles.navIcon}>❖</span>
-            About
+            Examples
           </a>
         </nav>
 
