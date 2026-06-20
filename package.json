@@ -28,6 +28,7 @@
     "@prisma/adapter-better-sqlite3": "^7.8.0",
     "@prisma/adapter-pg": "^7.8.0",
     "@prisma/client": "^7.8.0",
+    "3d-force-graph": "^1.80.0",
     "cytoscape": "^3.34.0",
     "cytoscape-fcose": "^2.2.0",
     "katex": "^0.17.0",
@@ -43,6 +44,7 @@
     "remark-gfm": "^4.0.1",
     "remark-math": "^6.0.0",
     "server-only": "^0.0.1",
+    "three": "^0.184.0",
     "zod": "^4.4.3"
   },
   "devDependencies": {

@@ -78,6 +78,42 @@
   font-weight: 500;
 }
 
+/* ---- 2D/3D view toggle -------------------------------------------------- */
+.viewToggle {
+  position: absolute;
+  top: 12px;
+  right: 12px;
+  display: inline-flex;
+  gap: 2px;
+  padding: 3px;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--kg-text) 8%, var(--kg-bg));
+  border: 1px solid var(--kg-border);
+  z-index: 6;
+}
+
+.viewBtn,
+.viewBtnActive {
+  border: none;
+  cursor: pointer;
+  font-size: 12px;
+  font-weight: 700;
+  padding: 5px 12px;
+  border-radius: 999px;
+  background: transparent;
+  color: var(--kg-muted);
+  transition: all 0.18s ease;
+}
+
+.viewBtn:hover {
+  color: var(--kg-text);
+}
+
+.viewBtnActive {
+  background: var(--kg-primary);
+  color: var(--kg-primary-ink);
+}
+
 /* ---- legend ------------------------------------------------------------- */
 .legend {
   position: absolute;

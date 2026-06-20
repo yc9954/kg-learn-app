@@ -17,10 +17,15 @@
  */
 
 import { useMemo, useState } from "react";
+import dynamic from "next/dynamic";
 import type { Concept, KnowledgeGraph } from "@/lib/ontology/types";
 import { useGraphStream } from "@/lib/graph/useGraphStream";
 import GraphCanvas from "./GraphCanvas";
 import styles from "./graph.module.css";
+
+const Graph3D = dynamic(() => import("./Graph3D"), { ssr: false });
+
+type ViewMode = "2d" | "3d";
 
 export type GraphViewProps = {
   /** Live research session id from `POST /api/research`. */
@@ -44,6 +49,7 @@ export default function GraphView({
     graph,
   );
   const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [view, setView] = useState<ViewMode>("2d");
 
   const selected: Concept | undefined = useMemo(
     () => nodes.find((n) => n.id === selectedId),
@@ -54,16 +60,45 @@ export default function GraphView({
 
   return (
     <div className={styles.wrap} data-status={status} data-connection={connection}>
-      <GraphCanvas
-        className={styles.canvas}
-        nodes={nodes}
-        edges={edges}
-        status={status}
-        selectedId={selectedId}
-        onSelect={setSelectedId}
-        currentId={currentId}
-        nextIds={nextIds}
-      />
+      {view === "3d" ? (
+        <Graph3D
+          className={styles.canvas}
+          nodes={nodes}
+          edges={edges}
+          selectedId={selectedId}
+          onSelect={setSelectedId}
+          currentId={currentId}
+          nextIds={nextIds}
+        />
+      ) : (
+        <GraphCanvas
+          className={styles.canvas}
+          nodes={nodes}
+          edges={edges}
+          status={status}
+          selectedId={selectedId}
+          onSelect={setSelectedId}
+          currentId={currentId}
+          nextIds={nextIds}
+        />
+      )}
+
+      <div className={styles.viewToggle} role="group" aria-label="Graph view mode">
+        <button
+          type="button"
+          className={view === "2d" ? styles.viewBtnActive : styles.viewBtn}
+          onClick={() => setView("2d")}
+        >
+          2D
+        </button>
+        <button
+          type="button"
+          className={view === "3d" ? styles.viewBtnActive : styles.viewBtn}
+          onClick={() => setView("3d")}
+        >
+          3D
+        </button>
+      </div>
 
       <StatusBadge
         status={status}

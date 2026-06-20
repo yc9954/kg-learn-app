@@ -172,7 +172,13 @@ export default function GraphCanvas({
       const added = cy.collection();
       for (const def of newNodes) added.merge(cy.getElementById(def.data!.id!));
       for (const def of newEdges) added.merge(cy.getElementById(def.data!.id!));
-      requestAnimationFrame(() => added.removeClass("entering"));
+      requestAnimationFrame(() => {
+        added.removeClass("entering");
+        // Brief "pop" glow on newly added nodes so growth reads as visceral.
+        const addedNodes = added.nodes();
+        addedNodes.addClass("justAdded");
+        setTimeout(() => addedNodes.removeClass("justAdded"), 900);
+      });
       scheduleLayout(cy);
     }
 
@@ -388,6 +394,15 @@ function buildStylesheet(): cytoscape.StylesheetStyle[] {
       // Entering elements start invisible/small; removing the class animates in.
       selector: ".entering",
       style: { opacity: 0, width: 6, height: 6 },
+    },
+    {
+      // Fresh-pop glow: a thick bright ring that fades as the class is removed.
+      selector: "node.justAdded",
+      style: {
+        "border-width": 6,
+        "border-color": "#ffd23f",
+        "background-color": "#3fd0cc",
+      },
     },
     {
       selector: "edge.entering",
