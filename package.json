@@ -23,6 +23,7 @@
     "node": "^20.19.0 || >=22.12.0"
   },
   "dependencies": {
+    "@github/copilot": "^1.0.63",
     "@github/copilot-sdk": "^1.0.2",
     "@prisma/adapter-better-sqlite3": "^7.8.0",
     "@prisma/adapter-pg": "^7.8.0",
@@ -51,6 +52,7 @@
     "@types/react-dom": "^19",
     "eslint": "^9",
     "eslint-config-next": "16.2.9",
+    "playwright": "^1.61.0",
     "tsx": "^4.22.4",
     "typescript": "^5"
   }

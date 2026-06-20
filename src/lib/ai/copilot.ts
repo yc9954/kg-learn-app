@@ -28,6 +28,7 @@ import path from "node:path";
 import fs from "node:fs";
 import {
   CopilotClient,
+  RuntimeConnection,
   approveAll,
   defineTool,
   type ProviderConfig,
@@ -66,6 +67,12 @@ function resolveCopilotHome(): string {
     /* best-effort; the runtime will surface a clear error if unwritable */
   }
   return home;
+}
+
+/** Resolve a deterministic local Copilot runtime path (avoids Next.js path issues). */
+function resolveCopilotCliPath(): string {
+  if (process.env.COPILOT_CLI_PATH?.trim()) return process.env.COPILOT_CLI_PATH.trim();
+  return path.join(process.cwd(), "node_modules", "@github", "copilot", "index.js");
 }
 
 /**
@@ -131,6 +138,7 @@ class CopilotProviderImpl {
     if (this.client) return this.client;
     if (!this.startPromise) {
       const client = new CopilotClient({
+        connection: RuntimeConnection.forStdio({ path: resolveCopilotCliPath() }),
         baseDirectory: resolveCopilotHome(),
         env: { ...process.env, COPILOT_HOME: resolveCopilotHome() },
       });
