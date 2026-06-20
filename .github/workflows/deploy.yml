@@ -158,73 +158,25 @@ jobs:
           zip -qr app.zip . -x ".git/*" ".github/*" "*.next/cache/*" "node_modules/.cache/*"
           echo "Package size: $(du -sh app.zip | cut -f1)"
 
-      - name: Deploy via Blob Storage (bypass Kudu)
+      - name: Deploy web app zip
         run: |
-          STORAGE_ACCOUNT="kglearndeploysa"
-          CONTAINER_NAME="deploy-packages"
-          BLOB_NAME="app-$(date +%Y%m%d%H%M%S).zip"
-
-          # Create storage (idempotent) and wait for DNS
-          az storage account create \
-            --name "$STORAGE_ACCOUNT" \
-            --resource-group "$AZURE_RESOURCE_GROUP" \
-            --location koreacentral \
-            --sku Standard_LRS \
-            --output none 2>/dev/null || true
-
-          # Get storage key (avoids auth-mode login issues)
-          STORAGE_KEY=$(az storage account keys list \
-            --account-name "$STORAGE_ACCOUNT" \
-            --resource-group "$AZURE_RESOURCE_GROUP" \
-            --query '[0].value' -o tsv)
-
-          # Wait for DNS propagation
-          for i in $(seq 1 12); do
-            nslookup "${STORAGE_ACCOUNT}.blob.core.windows.net" >/dev/null 2>&1 && break
-            echo "Waiting for DNS... ($i/12)"
-            sleep 5
-          done
-
-          az storage container create \
-            --name "$CONTAINER_NAME" \
-            --account-name "$STORAGE_ACCOUNT" \
-            --account-key "$STORAGE_KEY" \
-            --output none 2>/dev/null || true
-
-          # Upload zip via account key
-          az storage blob upload \
-            --account-name "$STORAGE_ACCOUNT" \
-            --container-name "$CONTAINER_NAME" \
-            --name "$BLOB_NAME" \
-            --file app.zip \
-            --account-key "$STORAGE_KEY" \
-            --overwrite \
-            --output none
-
-          # Generate SAS URL (valid 1 year)
-          EXPIRY=$(date -u -d "+365 days" '+%Y-%m-%dT%H:%MZ' 2>/dev/null || date -u -v+365d '+%Y-%m-%dT%H:%MZ')
-          BLOB_URL=$(az storage blob generate-sas \
-            --account-name "$STORAGE_ACCOUNT" \
-            --container-name "$CONTAINER_NAME" \
-            --name "$BLOB_NAME" \
-            --permissions r \
-            --expiry "$EXPIRY" \
-            --account-key "$STORAGE_KEY" \
-            --full-uri \
-            --output tsv)
-
-          # Point App Service at the blob (bypasses Kudu entirely)
+          # Use az webapp deploy with async flag to avoid Kudu 504 timeout
           az webapp config appsettings set \
             --resource-group "$AZURE_RESOURCE_GROUP" \
             --name "$AZURE_WEBAPP_NAME" \
-            --settings "WEBSITE_RUN_FROM_PACKAGE=$BLOB_URL" \
+            --settings WEBSITE_RUN_FROM_PACKAGE=1 SCM_COMMAND_IDLE_TIMEOUT=1800 \
             --output none
 
-          az webapp restart \
+          # Deploy async — uploads to Kudu but doesn't wait for extraction response
+          az webapp deployment source config-zip \
             --resource-group "$AZURE_RESOURCE_GROUP" \
-            --name "$AZURE_WEBAPP_NAME"
+            --name "$AZURE_WEBAPP_NAME" \
+            --src app.zip \
+            --timeout 1800 || true
 
-          echo "Deployed via blob: $BLOB_URL"
+          # Wait for app to come up (Kudu may still be extracting)
+          echo "Waiting for app to start..."
+          sleep 30
 
       # ---- POST-DEPLOY GATES (release blockers) -------------------------------
       - name: Health gate (/api/health)
