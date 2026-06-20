@@ -126,16 +126,43 @@ jobs:
         run: |
           npm prune --omit=dev
           npx prisma generate
+
+          # --- Trim ~600MB of unused platform-specific binaries ---
+          # Copilot SDK ships prebuilds for all OS; App Service is linux-x64 only.
+          for dir in node_modules/@github/copilot/prebuilds/*; do
+            base=$(basename "$dir")
+            if [ "$base" != "linux-x64" ]; then rm -rf "$dir"; fi
+          done
+          # Remove macOS optional dep (CI installs linux-x64 instead)
+          rm -rf node_modules/@github/copilot-darwin-arm64
+          rm -rf node_modules/@github/copilot-darwin-x64
+          rm -rf node_modules/@github/copilot-win32-x64
+          rm -rf node_modules/@github/copilot-win32-arm64
+          # Nested copies inside copilot-sdk
+          rm -rf node_modules/@github/copilot-sdk/node_modules/@github/copilot-darwin-arm64
+          rm -rf node_modules/@github/copilot-sdk/node_modules/@github/copilot-darwin-x64
+          rm -rf node_modules/@github/copilot-sdk/node_modules/@github/copilot-win32-x64
+          rm -rf node_modules/@github/copilot-sdk/node_modules/@github/copilot-win32-arm64
+          # better-sqlite3 is dev-only (prod uses PostgreSQL)
+          rm -rf node_modules/better-sqlite3
+
           zip -qr app.zip . -x ".git/*" ".github/*" "*.next/cache/*"
+          echo "Package size: $(du -sh app.zip | cut -f1)"
 
       - name: Deploy web app zip
         run: |
+          az webapp config appsettings set \
+            --resource-group "$AZURE_RESOURCE_GROUP" \
+            --name "$AZURE_WEBAPP_NAME" \
+            --settings SCM_COMMAND_IDLE_TIMEOUT=1800 \
+            --output none
           az webapp deploy \
             --resource-group "$AZURE_RESOURCE_GROUP" \
             --name "$AZURE_WEBAPP_NAME" \
             --src-path app.zip \
             --type zip \
-            --restart true
+            --restart true \
+            --timeout 1800
 
       # ---- POST-DEPLOY GATES (release blockers) -------------------------------
       - name: Health gate (/api/health)

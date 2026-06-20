@@ -354,6 +354,24 @@
   cursor: progress;
 }
 
+.googleButton {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  background: #fff;
+  color: #3c4043;
+  border: 1px solid #dadce0;
+  font-family: 'Google Sans', -apple-system, sans-serif;
+}
+.googleButton:hover:not(:disabled) {
+  background: #f7f8f8;
+  border-color: #d2e3fc;
+  filter: none;
+}
+.googleIcon {
+  flex-shrink: 0;
+}
+
 .error {
   margin: 10px 0 0;
   color: #b91c1c;

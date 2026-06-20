@@ -18,6 +18,7 @@ import type { NextRequest } from "next/server";
 import type { GraphEvent } from "@/lib/ontology/types";
 import { subscribe, cleanup, isDone } from "@/lib/research/bus";
 import { replayEvents, loadGraph } from "@/lib/research/persist";
+import { getCurrentUserId } from "@/lib/auth/current-user";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -25,6 +26,12 @@ export const dynamic = "force-dynamic";
 const HEARTBEAT_MS = 20_000;
 
 export async function GET(request: NextRequest) {
+  try {
+    await getCurrentUserId();
+  } catch {
+    return new Response("authentication required", { status: 401 });
+  }
+
   const sessionId = request.nextUrl.searchParams.get("sessionId");
   if (!sessionId) {
     return new Response("missing sessionId", { status: 400 });

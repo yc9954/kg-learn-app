@@ -12,6 +12,7 @@
 
 import { type NextRequest } from "next/server";
 import { CopilotProvider } from "@/lib/ai/copilot";
+import { getCurrentUserId } from "@/lib/auth/current-user";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -40,6 +41,12 @@ function renderTranscript(messages: ChatMessage[]): string {
 }
 
 export async function POST(request: NextRequest) {
+  try {
+    await getCurrentUserId();
+  } catch {
+    return new Response("authentication required", { status: 401 });
+  }
+
   let body: Body;
   try {
     body = (await request.json()) as Body;

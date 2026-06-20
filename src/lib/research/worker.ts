@@ -16,7 +16,7 @@
 import "server-only";
 import type { GraphEvent } from "@/lib/ontology/types";
 import { runResearch, type RunResearchOptions } from "./orchestrate";
-import { publish, isDone } from "./bus";
+import { publish, isDone, cleanup } from "./bus";
 import { persistEvent, persistStatus } from "./persist";
 import type { ResearchBudget } from "./convergence";
 
@@ -87,6 +87,7 @@ export function startResearchWorker(args: StartResearchArgs): void {
       }
     } finally {
       running.delete(args.topicId);
+      cleanup(args.topicId);
     }
   })();
 }
