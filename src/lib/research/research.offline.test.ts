@@ -205,6 +205,68 @@ async function run() {
     assert.ok(lastNodeIdx < firstEdgeIdx, "nodes stream before edges");
   });
 
+  await check("runResearch works with NO search (Copilot-SDK-only)", async () => {
+    // No `search` dep, no provider, useAgent omitted → pure knowledge mode.
+    // The injected extractor must still receive a non-empty `focus` (frontier).
+    let round = 0;
+    const focuses: (string | undefined)[] = [];
+    const events: GraphEvent[] = [];
+    const result = await runResearch({
+      topicId: "tY",
+      topic: "linear algebra",
+      parallelAgents: 1,
+      budget: { patience: 1, maxRounds: 5 },
+      deps: {
+        extract: async (_topic, sources, _graph, focus) => {
+          round += 1;
+          focuses.push(focus);
+          // Knowledge mode must NOT pass any web sources to the extractor.
+          assert.equal(sources.length, 0, "no web sources in SDK-only mode");
+          if (round === 1) {
+            return {
+              newConcepts: [
+                { id: "scalars", name: "Scalars", definition: "", summary: "", known: false },
+              ],
+              newEdges: [],
+              conceptSources: new Map(),
+              rejectedEdges: [],
+            };
+          }
+          return {
+            newConcepts: [],
+            newEdges: [],
+            conceptSources: new Map(),
+            rejectedEdges: [],
+          };
+        },
+      },
+      onEvent: (e) => {
+        events.push(e);
+      },
+    });
+    assert.equal(result.graph.nodes.length, 1);
+    assert.ok(typeof focuses[0] === "string" && focuses[0].length > 0,
+      "frontier focus passed to extractor");
+    assert.ok(
+      ["converged", "stopped"].includes(result.status),
+      "ends in a terminal status without any search provider",
+    );
+  });
+
+  await check("extract uses model knowledge when sources are empty", async () => {
+    // With no sources, the prompt must still ask the model to use its knowledge
+    // and the extractor must produce concepts from the mocked model output.
+    let seenPrompt = "";
+    const mock: GenerateFn = async (prompt) => {
+      seenPrompt = prompt;
+      return JSON.stringify({ concepts: [{ name: "Vectors" }], edges: [] });
+    };
+    const res = await extractConcepts("linear algebra", [], emptyGraph(), mock, "Vectors");
+    assert.equal(res.newConcepts.length, 1);
+    assert.ok(/your own expert knowledge/i.test(seenPrompt), "knowledge-mode prompt");
+    assert.ok(/FOCUS:/.test(seenPrompt), "focus included in prompt");
+  });
+
   console.log(`\n${passed} checks passed.`);
 }
 

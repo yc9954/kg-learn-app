@@ -91,7 +91,7 @@ param entraIssuer string = ''
 
 // ---- Web search -------------------------------------------------------------
 @secure()
-@description('Tavily web-search key. The ONE user-supplied secret. Empty = placeholder; research 401s until filled.')
+@description('OPTIONAL Tavily web-search key (enrichment only). Empty = placeholder; research works without it via the Copilot SDK.')
 param tavilyApiKey string = ''
 
 // ---- Object id that should administer Key Vault (optional; e.g. the deployer)

@@ -5,7 +5,7 @@
     "_generator": {
       "name": "bicep",
       "version": "0.44.1.10279",
-      "templateHash": "15544967878845212710"
+      "templateHash": "9341063468094314624"
     }
   },
   "parameters": {
@@ -168,7 +168,7 @@
       "type": "securestring",
       "defaultValue": "",
       "metadata": {
-        "description": "Tavily web-search key. The ONE user-supplied secret. Empty = placeholder; research 401s until filled."
+        "description": "OPTIONAL Tavily web-search key (enrichment only). Empty = placeholder; research works without it via the Copilot SDK."
       }
     },
     "adminObjectId": {

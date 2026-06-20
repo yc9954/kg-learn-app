@@ -73,9 +73,10 @@
   },
 
   "search": {
-    "provider": "tavily",
+    "provider": "none",
     "envVar": "TAVILY_API_KEY",
-    "$comment": "Web-search provider for research-engine (exempt from the Azure-only rule). This is the ONE secret the user must supply (no Azure resource creates it). If absent at deploy time, deploy everything else and leave TAVILY_API_KEY as a clearly-flagged placeholder App Setting; research will 401 until it is filled. Alternatively switch to Azure Grounding-with-Bing to keep it on Azure."
+    "required": false,
+    "$comment": "Research runs purely on the Copilot SDK (Azure Foundry gpt-5-mini) — it expands the prerequisite graph from the model's own knowledge, so NO web-search key is required to deploy or operate. Web search is an OPTIONAL enrichment: set provider:'tavily' + supply TAVILY_API_KEY (exempt from the Azure-only rule) only if you want live web-source citations. Absent → research still works fully."
   },
 
   "cicd": {
@@ -88,7 +89,7 @@
 
   "manualStepsAllowed": [
     "az login (one interactive browser auth if no active subscription)",
-    "supply TAVILY_API_KEY (only if web search should work at first deploy)"
+    "supply TAVILY_API_KEY (OPTIONAL — only for live web citations; research works without it)"
   ],
   "$finalComment": "Everything not in manualStepsAllowed is pre-decided here. The deploy agent provisions, wires secrets, sets up CI, and reports the public URL without further questions."
 }

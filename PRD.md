@@ -126,15 +126,16 @@ Guards (runtime invariants every module upholds):
 > without asking. Defaults: hosting **koreacentral** (App Service B1, Node 22), Foundry **eastus2**
 > (**gpt-5** for lectures/assessment + **gpt-5-mini** for high-volume research), Postgres Flexible **Standard_B1ms** v16, secrets in **Azure Key Vault**, auth via
 > **Entra ID**, CI via **GitHub Actions OIDC** on `main`. The only interactive step is `az login`
-> once; the only user-supplied secret is the web-search key (`TAVILY_API_KEY`).
+> once; **no other secret is required** — research runs on the Copilot SDK alone (the optional
+> `TAVILY_API_KEY` only adds live web citations).
 
 - `AZURE_AI_FOUNDRY_ENDPOINT`, `AZURE_AI_FOUNDRY_API_KEY`, `FOUNDRY_DEPLOYMENT_NAME` (quality tier,
   `gpt-5`) + `FOUNDRY_FAST_DEPLOYMENT_NAME` (cost/speed tier, `gpt-5-mini`, used by research
   extraction) — BYOK backend (created during deploy; key stored in Azure Key Vault).
 - `DATABASE_URL` — `file:./dev.db` locally; Azure PostgreSQL in prod (CI flips the Prisma provider).
 - `AUTH_SECRET` (+ Entra ID creds if used).
-- A web-search provider key (Tavily / Bing / SerpAPI) — intentionally exempt from the Azure-only
-  rule (egress, not a host/model).
+- *(Optional)* a web-search provider key (Tavily / Bing / SerpAPI) — enrichment ONLY, intentionally
+  exempt from the Azure-only rule (egress, not a host/model). Research works fully without it.
 - `COPILOT_HOME` — per-instance local temp.
 - `COPILOT_GITHUB_TOKEN` / `GH_TOKEN` / `GITHUB_TOKEN` — **dev-only** fallback; never in deployed env.
 

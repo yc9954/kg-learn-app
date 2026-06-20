@@ -1,12 +1,14 @@
 /**
- * Orchestrator (PRD §8 step 2). Drives multi-round, multi-agent web research
- * that expands a prerequisite-graph frontier and maps every discovery to a
- * `GraphEvent` the caller streams + persists.
+ * Orchestrator (PRD §8 step 2). Drives multi-round research that expands a
+ * prerequisite-graph frontier and maps every discovery to a `GraphEvent` the
+ * caller streams + persists.
  *
  * Responsibilities:
- *  - Drive research via `CopilotProvider.runAgent`, registering `search` as a
- *    custom tool (`defineTool` + a zod `parameters` schema) the agent invokes
- *    autonomously. Run N parallel agents (default 3) expanding the frontier.
+ *  - By DEFAULT, expand the frontier purely from the Copilot SDK's own knowledge
+ *    (`CopilotProvider.generate` via the extractor) — no external web search or
+ *    API keys required. Web search (Tavily/arXiv, optionally agentic via
+ *    `CopilotProvider.runAgent`) is an OPTIONAL enrichment, enabled only when a
+ *    `search`/`provider`/`useAgent` dep is supplied.
  *  - Server-side CONCURRENCY LIMITER (a semaphore sized users × parallelAgents)
  *    so we never open more Foundry sessions than we can afford.
  *  - Foundry 429 BACK-OFF (exponential + jitter) around model calls.
@@ -211,17 +213,21 @@ async function gatherSources(
 /* -------------------------------------------------------------------------- */
 
 export type ResearchDeps = {
-  /** Search function (default: searchAll over Tavily + arXiv). */
+  /**
+   * OPTIONAL web-search enrichment. By default research runs source-free via the
+   * Copilot SDK alone; pass a `search`/`provider` (or `useAgent`) to opt back in.
+   */
   search?: (query: string) => Promise<WebSource[]>;
   /** Extractor (default: extractConcepts via CopilotProvider fast tier). */
   extract?: (
     topic: string,
     sources: WebSource[],
     graph: KnowledgeGraph,
+    focus?: string,
   ) => Promise<ExtractionResult>;
-  /** Use the agentic search loop (default: true; auto-disabled w/o Foundry). */
+  /** Use the agentic search loop (default: false). Implies web search. */
   useAgent?: boolean;
-  /** Optional explicit search provider (for the default search). */
+  /** Optional explicit search provider (enables web-search enrichment). */
   provider?: WebSearchProvider;
 };
 
@@ -231,8 +237,11 @@ type ResolvedDeps = {
     topic: string,
     sources: WebSource[],
     graph: KnowledgeGraph,
+    focus?: string,
   ) => Promise<ExtractionResult>;
   useAgent: boolean;
+  /** Whether ANY web search runs; false → pure Copilot-SDK knowledge mode. */
+  searchEnabled: boolean;
 };
 
 export type RunResearchOptions = {
@@ -255,12 +264,19 @@ export type RunResearchResult = {
 };
 
 function resolveDeps(deps: ResearchDeps | undefined): ResolvedDeps {
+  // Web search is OFF by default — research runs purely on the Copilot SDK's own
+  // knowledge. Providing a search fn, a provider, or useAgent opts back in.
+  const searchEnabled = Boolean(deps?.search || deps?.provider || deps?.useAgent);
   return {
     search:
       deps?.search ??
       ((q: string) => searchAll(q, {}, deps?.provider)),
-    extract: deps?.extract ?? extractConcepts,
-    useAgent: deps?.useAgent ?? true,
+    extract:
+      deps?.extract ??
+      ((topic, sources, graph, focus) =>
+        extractConcepts(topic, sources, graph, undefined, focus)),
+    useAgent: deps?.useAgent ?? false,
+    searchEnabled,
   };
 }
 
@@ -313,24 +329,29 @@ export async function runResearch(
     }
     for (const q of batch) searchedQueries.add(q.toLowerCase());
 
-    // Run the batch of frontier agents in parallel (bounded by the limiter).
-    const perAgent = await Promise.all(
-      batch.map((q) =>
-        sessionLimiter
-          .run(() => gatherSources(opts.topic, q, deps))
-          .catch((err) => {
-            console.warn("[research/orchestrate] gatherSources failed", err);
-            return [] as WebSource[];
-          }),
-      ),
-    );
-    const roundSources = dedupeSources(perAgent.flat());
+    // Copilot-SDK knowledge mode by default: expand the frontier directly from
+    // the model's own knowledge. Web search runs only when explicitly enabled.
+    const focus = batch.join(", ");
+    let roundSources: WebSource[] = [];
+    if (deps.searchEnabled) {
+      const perAgent = await Promise.all(
+        batch.map((q) =>
+          sessionLimiter
+            .run(() => gatherSources(opts.topic, q, deps))
+            .catch((err) => {
+              console.warn("[research/orchestrate] gatherSources failed", err);
+              return [] as WebSource[];
+            }),
+        ),
+      );
+      roundSources = dedupeSources(perAgent.flat());
+    }
 
-    // Extract concepts/edges from this round's sources against the live graph.
+    // Extract concepts/edges for this frontier focus against the live graph.
     let extraction: ExtractionResult;
     try {
       extraction = await withFoundryBackoff(() =>
-        deps.extract(opts.topic, roundSources, graph),
+        deps.extract(opts.topic, roundSources, graph, focus),
       );
     } catch (err) {
       console.warn("[research/orchestrate] extraction failed this round", err);

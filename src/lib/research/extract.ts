@@ -1,8 +1,12 @@
 /**
- * Extractor (PRD §8 step 2). Given web/scholarly sources + the current graph,
- * call the Copilot SDK (`CopilotProvider.generate`, tier:"fast" → gpt-5-mini,
- * the cost/speed tier for high-volume extraction) to extract NEW `Concept`s and
- * `PrerequisiteEdge`s.
+ * Extractor (PRD §8 step 2). Given the current graph (and OPTIONALLY some web/
+ * scholarly sources) plus a `focus` frontier concept, call the Copilot SDK
+ * (`CopilotProvider.generate`, tier:"fast" → gpt-5-mini, the cost/speed tier for
+ * high-volume extraction) to extract NEW `Concept`s and `PrerequisiteEdge`s.
+ *
+ * By default the engine runs SOURCE-FREE: with no `sources` the model uses its
+ * own expert knowledge of the topic to expand the prerequisite graph. Web search
+ * is an optional enrichment, not a dependency.
  *
  * Rules enforced here:
  *  - Reuse existing concept names; only add genuinely new concepts
@@ -127,6 +131,7 @@ function buildPrompt(
   topic: string,
   sources: WebSource[],
   graph: KnowledgeGraph,
+  focus?: string,
 ): string {
   const existing = graph.nodes.map((n) => n.name).join(", ") || "(none yet)";
   const sourceText = sources
@@ -137,13 +142,18 @@ function buildPrompt(
     )
     .join("\n\n");
 
+  const focusLine =
+    focus && focus.trim()
+      ? `FOCUS: expand the DIRECT PREREQUISITE concepts a learner must understand in order to grasp: ${focus.trim()}. Add those prerequisites (and, where helpful, their prerequisites) and the edges connecting them.\n\n`
+      : "";
+
   return `TOPIC: ${topic}
 
-CONCEPTS ALREADY IN THE GRAPH (reuse these names exactly when relevant):
+${focusLine}CONCEPTS ALREADY IN THE GRAPH (reuse these names exactly when relevant):
 ${existing}
 
 SOURCES:
-${sourceText || "(no sources retrieved; use general knowledge of the topic)"}
+${sourceText || "(no external sources — use your own expert knowledge of the topic to identify the concepts and prerequisite relationships)"}
 
 Return JSON shaped exactly:
 {
@@ -187,6 +197,7 @@ export async function extractConcepts(
   sources: WebSource[],
   graph: KnowledgeGraph,
   generate: GenerateFn = defaultGenerate,
+  focus?: string,
 ): Promise<ExtractionResult> {
   const result: ExtractionResult = {
     newConcepts: [],
@@ -197,7 +208,7 @@ export async function extractConcepts(
 
   let parsed: RawExtraction;
   try {
-    const raw = await generate(buildPrompt(topic, sources, graph), {
+    const raw = await generate(buildPrompt(topic, sources, graph, focus), {
       tier: "fast",
       system: EXTRACT_SYSTEM,
     });
