@@ -138,23 +138,33 @@ jobs:
           rm -rf node_modules/@github/copilot-darwin-x64
           rm -rf node_modules/@github/copilot-win32-x64
           rm -rf node_modules/@github/copilot-win32-arm64
+          rm -rf node_modules/@github/copilot-linux-arm64
           # Nested copies inside copilot-sdk
           rm -rf node_modules/@github/copilot-sdk/node_modules/@github/copilot-darwin-arm64
           rm -rf node_modules/@github/copilot-sdk/node_modules/@github/copilot-darwin-x64
           rm -rf node_modules/@github/copilot-sdk/node_modules/@github/copilot-win32-x64
           rm -rf node_modules/@github/copilot-sdk/node_modules/@github/copilot-win32-arm64
+          rm -rf node_modules/@github/copilot-sdk/node_modules/@github/copilot-linux-arm64
           # better-sqlite3 is dev-only (prod uses PostgreSQL)
           rm -rf node_modules/better-sqlite3
+          # Remove nested prebuilds in copilot-sdk's copilot dep too
+          for dir in node_modules/@github/copilot-sdk/node_modules/@github/copilot/prebuilds/*; do
+            base=$(basename "$dir")
+            if [ "$base" != "linux-x64" ]; then rm -rf "$dir"; fi
+          done
+          # Strip test/doc/example dirs from large deps
+          find node_modules -type d \( -name "__tests__" -o -name "test" -o -name "tests" -o -name "docs" -o -name "example" -o -name "examples" \) -exec rm -rf {} + 2>/dev/null || true
 
-          zip -qr app.zip . -x ".git/*" ".github/*" "*.next/cache/*"
+          zip -qr app.zip . -x ".git/*" ".github/*" "*.next/cache/*" "node_modules/.cache/*"
           echo "Package size: $(du -sh app.zip | cut -f1)"
 
       - name: Deploy web app zip
         run: |
+          # Enable run-from-package: mounts the zip directly, skipping Kudu extraction
           az webapp config appsettings set \
             --resource-group "$AZURE_RESOURCE_GROUP" \
             --name "$AZURE_WEBAPP_NAME" \
-            --settings SCM_COMMAND_IDLE_TIMEOUT=1800 \
+            --settings WEBSITE_RUN_FROM_PACKAGE=1 \
             --output none
           az webapp deploy \
             --resource-group "$AZURE_RESOURCE_GROUP" \
