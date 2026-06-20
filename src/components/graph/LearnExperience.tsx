@@ -20,7 +20,6 @@ import {
   MessagesSquare,
   Network,
   Sparkles,
-  Trophy,
 } from "lucide-react";
 import GraphView, { type GraphStats } from "@/components/graph/GraphView";
 import LecturePanel, { type LectureProgress } from "@/components/graph/LecturePanel";
@@ -29,6 +28,7 @@ import AssessmentQuiz from "@/components/graph/AssessmentQuiz";
 import ProjectsPanel, {
   type ProjectSummary,
 } from "@/components/graph/ProjectsPanel";
+import LecturesLibraryPanel from "@/components/graph/LecturesLibraryPanel";
 import Progress from "@/components/ui/Progress";
 import { EXAMPLE_PROJECTS } from "@/lib/examples/projects";
 import styles from "./learn.module.css";
@@ -60,7 +60,7 @@ export default function LearnExperience() {
   const [error, setError] = useState<string | null>(null);
   const [progress, setProgress] = useState<LectureProgress | null>(null);
   const [mode, setMode] = useState<
-    "workspace" | "assessment" | "lectures" | "projects"
+    "workspace" | "assessment" | "lectures" | "projects" | "library"
   >("workspace");
   const [graphStats, setGraphStats] = useState<GraphStats | null>(null);
   const [autoStartLecture, setAutoStartLecture] = useState(false);
@@ -252,14 +252,26 @@ export default function LearnExperience() {
           <button
             type="button"
             className={
-              mode === "lectures" || mode === "projects"
-                ? styles.navItem
-                : styles.navItemActive
+              mode === "workspace" || mode === "assessment"
+                ? styles.navItemActive
+                : styles.navItem
             }
             onClick={backToGraph}
           >
             <Network className={styles.navIcon} size={18} aria-hidden />
             Graph &amp; Chat
+          </button>
+          <button
+            type="button"
+            className={
+              mode === "lectures" || mode === "library"
+                ? styles.navItemActive
+                : styles.navItem
+            }
+            onClick={() => setMode("library")}
+          >
+            <GraduationCap className={styles.navIcon} size={18} aria-hidden />
+            Lectures
           </button>
           <button
             type="button"
@@ -272,10 +284,6 @@ export default function LearnExperience() {
           <a className={styles.navItem} href="/examples">
             <LayoutGrid className={styles.navIcon} size={18} aria-hidden />
             Examples
-          </a>
-          <a className={styles.navItem} href="/leaderboard">
-            <Trophy className={styles.navIcon} size={18} aria-hidden />
-            Leaderboard
           </a>
         </nav>
 
@@ -298,16 +306,20 @@ export default function LearnExperience() {
           <h1 className={styles.pageTitle}>
             {mode === "lectures"
               ? "Lectures"
-              : mode === "projects"
-                ? "My Projects"
-                : "Knowledge Graph"}
+              : mode === "library"
+                ? "My Lectures"
+                : mode === "projects"
+                  ? "My Projects"
+                  : "Knowledge Graph"}
           </h1>
           <p className={styles.subtitle}>
-            {mode === "projects"
-              ? "Your saved research projects — reopen a graph or start a new one."
-              : "Enter a topic and watch its prerequisite graph build itself, live."}
+            {mode === "library"
+              ? "Every lecture you've generated — revisit your course any time."
+              : mode === "projects"
+                ? "Your saved research projects — reopen a graph or start a new one."
+                : "Enter a topic and watch its prerequisite graph build itself, live."}
           </p>
-          {mode !== "projects" && (
+          {mode !== "projects" && mode !== "library" && (
             <form className={styles.form} onSubmit={start}>
               <input
                 className={styles.input}
@@ -325,23 +337,30 @@ export default function LearnExperience() {
           {error && <p className={styles.error}>{error}</p>}
         </header>
 
-        {researching && mode !== "lectures" && mode !== "projects" && (
-          <div className={styles.researchBanner} role="status" aria-live="polite">
-            <span className={styles.researchPulse} aria-hidden />
-            <span className={styles.researchText}>
-              Researching <strong>{topic.trim() || "your topic"}</strong> — building
-              the prerequisite graph live
-            </span>
-            <span className={styles.researchCount}>
-              {graphStats?.total ?? 0} concepts so far
-            </span>
-            <span className={styles.researchDots} aria-hidden>
-              <span /> <span /> <span />
-            </span>
-          </div>
-        )}
+        {researching &&
+          mode !== "lectures" &&
+          mode !== "projects" &&
+          mode !== "library" && (
+            <div className={styles.researchBanner} role="status" aria-live="polite">
+              <span className={styles.researchPulse} aria-hidden />
+              <span className={styles.researchText}>
+                Researching <strong>{topic.trim() || "your topic"}</strong> — building
+                the prerequisite graph live
+              </span>
+              <span className={styles.researchCount}>
+                {graphStats?.total ?? 0} concepts so far
+              </span>
+              <span className={styles.researchDots} aria-hidden>
+                <span /> <span /> <span />
+              </span>
+            </div>
+          )}
 
-        {mode === "projects" ? (
+        {mode === "library" ? (
+          <div className={styles.panel}>
+            <LecturesLibraryPanel />
+          </div>
+        ) : mode === "projects" ? (
           <div className={styles.panel}>
             <ProjectsPanel onOpen={openProject} onNew={newProject} />
           </div>

@@ -1,11 +1,15 @@
 import type { NextAuthOptions } from "next-auth";
 import AzureADProvider from "next-auth/providers/azure-ad";
+import GoogleProvider from "next-auth/providers/google";
 import CredentialsProvider from "next-auth/providers/credentials";
 import { prisma } from "@/lib/db";
 
 const entraClientId = process.env.AUTH_MICROSOFT_ENTRA_ID_ID;
 const entraClientSecret = process.env.AUTH_MICROSOFT_ENTRA_ID_SECRET;
 const entraIssuer = process.env.AUTH_MICROSOFT_ENTRA_ID_ISSUER;
+
+const googleClientId = process.env.GOOGLE_CLIENT_ID;
+const googleClientSecret = process.env.GOOGLE_CLIENT_SECRET;
 
 const providers = [];
 
@@ -15,6 +19,17 @@ if (entraClientId && entraClientSecret && entraIssuer) {
       clientId: entraClientId,
       clientSecret: entraClientSecret,
       issuer: entraIssuer,
+    }),
+  );
+}
+
+if (googleClientId && googleClientSecret) {
+  providers.push(
+    GoogleProvider({
+      clientId: googleClientId,
+      clientSecret: googleClientSecret,
+      // Always show the account chooser so users can switch Google accounts.
+      authorization: { params: { prompt: "select_account" } },
     }),
   );
 }
