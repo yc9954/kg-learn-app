@@ -12,6 +12,7 @@ import { signIn, signOut, useSession } from "next-auth/react";
 import GraphView, { type GraphStats } from "@/components/graph/GraphView";
 import LecturePanel, { type LectureProgress } from "@/components/graph/LecturePanel";
 import ChatPanel from "@/components/graph/ChatPanel";
+import AssessmentQuiz from "@/components/graph/AssessmentQuiz";
 import { EXAMPLE_PROJECTS } from "@/lib/examples/projects";
 import styles from "./learn.module.css";
 
@@ -41,8 +42,30 @@ export default function LearnExperience() {
   const [starting, setStarting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [progress, setProgress] = useState<LectureProgress | null>(null);
-  const [activeTab, setActiveTab] = useState<"graph" | "lectures">("graph");
+  const [mode, setMode] = useState<"workspace" | "assessment" | "lectures">(
+    "workspace",
+  );
   const [graphStats, setGraphStats] = useState<GraphStats | null>(null);
+  const [autoStartLecture, setAutoStartLecture] = useState(false);
+
+  // "Generate lecture notes" → ALWAYS run the self-assessment quiz first.
+  function generateLectureNotes() {
+    if (!sessionId) return;
+    setMode("assessment");
+  }
+
+  function onAssessmentComplete() {
+    setAutoStartLecture(true);
+    setMode("lectures");
+  }
+
+  function backToGraph() {
+    setMode("workspace");
+  }
+
+  const researching =
+    graphStats?.status === "researching" ||
+    (!!sessionId && graphStats === null);
 
   async function start(e: React.FormEvent) {
     e.preventDefault();
@@ -53,6 +76,8 @@ export default function LearnExperience() {
     setError(null);
     setSessionId(null);
     setProgress(null);
+    setAutoStartLecture(false);
+    setMode("workspace");
     try {
       const res = await fetch("/api/research", {
         method: "POST",
@@ -65,7 +90,7 @@ export default function LearnExperience() {
       }
       const data = (await res.json()) as { sessionId: string };
       setSessionId(data.sessionId);
-      setActiveTab("graph");
+      setMode("workspace");
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to start research.");
     } finally {
@@ -186,19 +211,11 @@ export default function LearnExperience() {
         <nav className={styles.sidebarNav} aria-label="Workspace">
           <button
             type="button"
-            className={activeTab === "graph" ? styles.navItemActive : styles.navItem}
-            onClick={() => setActiveTab("graph")}
+            className={mode === "lectures" ? styles.navItem : styles.navItemActive}
+            onClick={backToGraph}
           >
             <span className={styles.navIcon}>◈</span>
-            Graph
-          </button>
-          <button
-            type="button"
-            className={activeTab === "lectures" ? styles.navItemActive : styles.navItem}
-            onClick={() => setActiveTab("lectures")}
-          >
-            <span className={styles.navIcon}>▤</span>
-            Lectures
+            Graph &amp; Chat
           </button>
           <a className={styles.navItem} href="/examples">
             <span className={styles.navIcon}>❖</span>
@@ -223,7 +240,7 @@ export default function LearnExperience() {
       <main className={styles.main}>
         <header className={styles.header}>
           <h1 className={styles.pageTitle}>
-            {activeTab === "graph" ? "Knowledge Graph" : "Lectures"}
+            {mode === "lectures" ? "Lectures" : "Knowledge Graph"}
           </h1>
           <p className={styles.subtitle}>
             Enter a topic and watch its prerequisite graph build itself, live.
@@ -244,29 +261,72 @@ export default function LearnExperience() {
           {error && <p className={styles.error}>{error}</p>}
         </header>
 
-        {activeTab === "graph" ? (
+        {researching && mode !== "lectures" && (
+          <div className={styles.researchBanner} role="status" aria-live="polite">
+            <span className={styles.researchPulse} aria-hidden />
+            <span className={styles.researchText}>
+              Researching <strong>{topic.trim() || "your topic"}</strong> — building
+              the prerequisite graph live
+            </span>
+            <span className={styles.researchCount}>
+              {graphStats?.total ?? 0} concepts so far
+            </span>
+            <span className={styles.researchDots} aria-hidden>
+              <span /> <span /> <span />
+            </span>
+          </div>
+        )}
+
+        {mode === "lectures" ? (
+          <div className={styles.panel}>
+            <button type="button" className={styles.backToGraph} onClick={backToGraph}>
+              ← Back to graph &amp; chat
+            </button>
+            <LecturePanel
+              sessionId={sessionId}
+              onProgress={setProgress}
+              autoStart={autoStartLecture}
+            />
+          </div>
+        ) : (
           <div className={styles.workspaceSplit}>
-            <div className={styles.workspaceGraph}>
-              <GraphView
-                sessionId={sessionId}
-                currentId={progress?.currentNodeId ?? null}
-                nextIds={progress?.nextIds}
-                onStats={setGraphStats}
+            <div className={styles.workspaceMain}>
+              <div className={styles.workspaceGraph}>
+                <GraphView
+                  sessionId={sessionId}
+                  currentId={progress?.currentNodeId ?? null}
+                  nextIds={progress?.nextIds}
+                  onStats={setGraphStats}
+                />
+              </div>
+              <StatusCard
+                topic={topic.trim()}
+                stats={graphStats}
+                canGenerate={!!sessionId && (graphStats?.total ?? 0) > 0}
+                onGenerate={generateLectureNotes}
               />
             </div>
             <aside className={styles.workspaceChat}>
-              <StatusCard topic={topic.trim()} stats={graphStats} />
+              <div className={styles.chatHeader}>
+                <span className={styles.chatTitle}>✦ Study assistant</span>
+                <span className={styles.chatHint}>Ask anything about your topic</span>
+              </div>
               <div className={styles.chatHost}>
                 <ChatPanel topic={topic.trim() || null} />
               </div>
             </aside>
           </div>
-        ) : (
-          <div className={styles.panel}>
-            <LecturePanel sessionId={sessionId} onProgress={setProgress} />
-          </div>
         )}
       </main>
+
+      {mode === "assessment" && sessionId && (
+        <AssessmentQuiz
+          topicId={sessionId}
+          topic={topic.trim()}
+          onComplete={onAssessmentComplete}
+          onCancel={backToGraph}
+        />
+      )}
     </div>
   );
 }
@@ -274,9 +334,13 @@ export default function LearnExperience() {
 function StatusCard({
   topic,
   stats,
+  canGenerate,
+  onGenerate,
 }: {
   topic: string;
   stats: GraphStats | null;
+  canGenerate: boolean;
+  onGenerate: () => void;
 }) {
   const total = stats?.total ?? 0;
   const known = stats?.known ?? 0;
@@ -326,6 +390,15 @@ function StatusCard({
         <div className={styles.progressFill} style={{ width: `${pct}%` }} />
       </div>
       <span className={styles.progressPct}>{pct}% mastered</span>
+
+      <button
+        type="button"
+        className={styles.generateBtn}
+        onClick={onGenerate}
+        disabled={!canGenerate}
+      >
+        Generate lecture notes →
+      </button>
     </div>
   );
 }

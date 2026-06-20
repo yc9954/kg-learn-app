@@ -136,11 +136,15 @@ export default function GraphCanvas({
       });
     }
 
+    // Add nodes FIRST so edge endpoints exist before we wire edges (otherwise a
+    // static graph delivering nodes+edges in one render drops every edge).
+    if (newNodes.length) cy.add(newNodes);
+
     const newEdges: ElementDefinition[] = [];
     for (const e of edges) {
       const id = edgeId(e);
       if (knownEdgeIds.current.has(id)) continue;
-      // Endpoints must exist (node events precede edge events; guard anyway).
+      // Endpoints must exist (guard against malformed edges).
       if (!cy.getElementById(e.from).nonempty()) continue;
       if (!cy.getElementById(e.to).nonempty()) continue;
       knownEdgeIds.current.add(id);
@@ -152,10 +156,7 @@ export default function GraphCanvas({
     }
 
     if (newNodes.length || newEdges.length) {
-      cy.batch(() => {
-        cy.add(newNodes);
-        cy.add(newEdges);
-      });
+      if (newEdges.length) cy.add(newEdges);
       // Next frame: drop the `entering` class so style transitions animate in.
       const added = cy.collection();
       for (const def of newNodes) added.merge(cy.getElementById(def.data!.id!));
@@ -221,23 +222,32 @@ export default function GraphCanvas({
 }
 
 // ---------------------------------------------------------------------------
-// Layout: incremental fcose, seeded from current positions, animate only when
-// the graph is small enough to stay smooth.
+// Layout: a layered, top-down hierarchy that reads the prerequisite DAG as a
+// flow (prerequisites on top → dependents below). Far clearer than a force
+// layout for small/medium graphs, and avoids the "scattered blobs" look.
 function runLayout(cy: Core) {
   const animate = cy.nodes().length <= ANIMATE_NODE_LIMIT;
   cy.layout({
-    name: "fcose",
-    quality: "default",
-    randomize: false, // seed from existing positions → stable, settles smoothly
+    name: "breadthfirst",
+    directed: true,
+    grid: false,
     animate,
-    animationDuration: 500,
+    animationDuration: 450,
     fit: true,
-    padding: 40,
-    nodeSeparation: 110,
-    idealEdgeLength: 90,
-    nodeRepulsion: 6000,
-    // fcose accepts extra options not in the base typings.
+    padding: 48,
+    spacingFactor: 1.5,
+    avoidOverlap: true,
+    nodeDimensionsIncludeLabels: true,
+    circle: false,
   } as cytoscape.LayoutOptions).run();
+
+  // With only a handful of nodes, `fit` zooms in hard and the nodes balloon.
+  // Cap the zoom so node size stays sensible, keeping the graph centred.
+  if (cy.zoom() > 1.1) {
+    const center = { x: cy.width() / 2, y: cy.height() / 2 };
+    cy.zoom({ level: 1.1, renderedPosition: center });
+    cy.center();
+  }
 }
 
 // Seed a new node at a connected, already-placed node's position (+ jitter), so
@@ -291,17 +301,22 @@ function buildStylesheet(): cytoscape.StylesheetStyle[] {
       style: {
         label: "data(label)",
         "font-size": 11,
-        color: "#0b1f2a",
-        "text-valign": "center",
+        "font-weight": 600,
+        color: "#1e293b",
+        "text-valign": "bottom",
         "text-halign": "center",
+        "text-margin-y": 5,
         "text-wrap": "wrap",
-        "text-max-width": "90px",
+        "text-max-width": "120px",
+        "text-background-color": "#f8fafc",
+        "text-background-opacity": 0.85,
+        "text-background-padding": "2px",
+        "text-background-shape": "roundrectangle",
         "background-color": "#2bb7b3", // frontier (default teal)
         "border-width": 2,
         "border-color": "#1d8a87",
-        width: 34,
-        height: 34,
-        "text-margin-y": 0,
+        width: 26,
+        height: 26,
         // Smooth transitions power the grow-in + state changes.
         "transition-property":
           "opacity, width, height, background-color, border-color, border-width",
@@ -325,8 +340,8 @@ function buildStylesheet(): cytoscape.StylesheetStyle[] {
         "background-color": "#ffd23f",
         "border-color": "#f59e0b",
         "border-width": 4,
-        width: 44,
-        height: 44,
+        width: 34,
+        height: 34,
         "z-index": 20,
       },
     },

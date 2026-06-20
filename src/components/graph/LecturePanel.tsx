@@ -9,7 +9,7 @@
  * (current/next concepts) is surfaced upward so the graph can highlight them.
  */
 
-import { useCallback, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import type { Lecture } from "@/lib/ontology/types";
 import LectureView from "@/components/Lecture";
 import styles from "./lecture.module.css";
@@ -33,9 +33,12 @@ export type LectureProgress = {
 export default function LecturePanel({
   sessionId,
   onProgress,
+  autoStart = false,
 }: {
   sessionId: string | null;
   onProgress?: (p: LectureProgress) => void;
+  /** When true, automatically fetch the first lecture once a session exists. */
+  autoStart?: boolean;
 }) {
   const [lecture, setLecture] = useState<Lecture | null>(null);
   const [path, setPath] = useState<string[]>([]);
@@ -84,6 +87,15 @@ export default function LecturePanel({
     },
     [sessionId, busy, onProgress],
   );
+
+  // Auto-fetch the first lecture when triggered from the graph ("Generate
+  // lecture notes" button) — no need to come here and press "Teach me".
+  useEffect(() => {
+    if (autoStart && sessionId && !started && !busy) {
+      void call("teach");
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [autoStart, sessionId]);
 
   if (!sessionId) return null;
 
