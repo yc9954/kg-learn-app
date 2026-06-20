@@ -6,19 +6,52 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "eslint"
+    "lint": "eslint",
+    "typecheck": "tsc --noEmit",
+    "test:guards": "tsx src/lib/ontology/invariants.smoke.ts",
+    "test:research": "tsx src/lib/research/research.offline.test.ts",
+    "test:assessment": "tsx src/lib/assessment/assessment.offline.test.ts",
+    "test:graph": "tsx src/lib/graph/graph.offline.test.ts",
+    "test:lectures": "tsx src/lib/lectures/lectures.offline.test.ts",
+    "test": "npm run test:guards && npm run test:research && npm run test:assessment && npm run test:graph && npm run test:lectures",
+    "db:dev": "node scripts/set-db-provider.mjs sqlite && prisma db push",
+    "db:deploy": "node scripts/set-db-provider.mjs postgresql && prisma migrate deploy",
+    "db:generate": "prisma generate",
+    "postinstall": "prisma generate"
+  },
+  "engines": {
+    "node": "^20.19.0 || >=22.12.0"
   },
   "dependencies": {
+    "@github/copilot-sdk": "^1.0.2",
+    "@prisma/adapter-better-sqlite3": "^7.8.0",
+    "@prisma/adapter-pg": "^7.8.0",
+    "@prisma/client": "^7.8.0",
+    "cytoscape": "^3.34.0",
+    "cytoscape-fcose": "^2.2.0",
+    "katex": "^0.17.0",
+    "mermaid": "^11.15.0",
     "next": "16.2.9",
+    "next-auth": "^4.24.14",
+    "prisma": "^7.8.0",
     "react": "19.2.4",
-    "react-dom": "19.2.4"
+    "react-cytoscapejs": "^2.0.0",
+    "react-dom": "19.2.4",
+    "react-markdown": "^10.1.0",
+    "rehype-katex": "^7.0.1",
+    "remark-gfm": "^4.0.1",
+    "remark-math": "^6.0.0",
+    "server-only": "^0.0.1",
+    "zod": "^4.4.3"
   },
   "devDependencies": {
+    "@types/cytoscape": "^3.21.9",
     "@types/node": "^20",
     "@types/react": "^19",
     "@types/react-dom": "^19",
     "eslint": "^9",
     "eslint-config-next": "16.2.9",
+    "tsx": "^4.22.4",
     "typescript": "^5"
   }
 }

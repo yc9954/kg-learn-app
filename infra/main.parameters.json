@@ -1,0 +1,20 @@
+{
+  "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentParameters.json#",
+  "contentVersion": "1.0.0.0",
+  "_comment": "Template ONLY. Do NOT commit real secrets here. infra/deploy.sh supplies postgresAdminPassword / authSecret / entra* / tavilyApiKey on the CLI at deploy time. Use this file only for a manual `az deployment group create --parameters @main.parameters.json` if you prefer, and supply secure params via --parameters key=value overrides.",
+  "parameters": {
+    "namePrefix": { "value": "kglearn" },
+    "location": { "value": "koreacentral" },
+    "foundryLocation": { "value": "eastus2" },
+    "appServicePlanSku": { "value": "B1" },
+    "postgresSkuName": { "value": "Standard_B1ms" },
+    "postgresSkuTier": { "value": "Burstable" },
+    "postgresVersion": { "value": "16" },
+    "postgresDatabaseName": { "value": "kglearn" },
+    "postgresAdminUser": { "value": "kgadmin" },
+    "foundryModel": { "value": "gpt-5" },
+    "foundryDeploymentName": { "value": "gpt-5" },
+    "foundryFastModel": { "value": "gpt-5-mini" },
+    "foundryFastDeploymentName": { "value": "gpt-5-mini" }
+  }
+}

@@ -32,6 +32,13 @@ yarn-error.log*
 
 # env files (can opt-in for committing if needed)
 .env*
+!.env.example
+
+# local SQLite dev database (never deploy to Azure)
+/dev.db
+/dev.db-journal
+prisma/dev.db
+prisma/*.db
 
 # vercel
 .vercel

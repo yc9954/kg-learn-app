@@ -1,0 +1,131 @@
+// Portable Prisma schema for the KG learning app.
+//
+// PORTABILITY RULES (so prod Postgres is a drop-in swap — PRD §5):
+//   - provider defaults to "sqlite" for local dev; scripts/set-db-provider.mjs
+//     rewrites ONLY this line to "postgresql" for prod (db:deploy). Never deploy
+//     the local SQLite file to Azure.
+//   - No native `enum` and no scalar arrays (`String[]`): SQLite supports
+//     neither. Use `String` for enum-like fields and relations or `Json` for
+//     list-like data. Keep everything in the portable relational subset.
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  // Prisma 7: the connection URL lives in prisma.config.ts (datasource.url) and
+  // is supplied to PrismaClient via a driver adapter (see src/lib/db.ts).
+  // scripts/set-db-provider.mjs rewrites ONLY this provider line for the prod swap.
+  provider = "sqlite"
+}
+
+model User {
+  id            String           @id @default(cuid())
+  email         String?          @unique
+  name          String?
+  image         String?
+  createdAt     DateTime         @default(now())
+  topics        Topic[]
+  progress      UserProgress[]
+  assessments   AssessmentResult[]
+}
+
+model Topic {
+  id          String           @id @default(cuid())
+  userId      String
+  user        User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  title       String
+  prompt      String
+  // GraphStatus as String (no enum): "idle" | "researching" | "converged" | "stopped"
+  status      String           @default("idle")
+  createdAt   DateTime         @default(now())
+  updatedAt   DateTime         @updatedAt
+  concepts    Concept[]
+  edges       Edge[]
+  lectures    Lecture[]
+  progress    UserProgress[]
+  assessments AssessmentResult[]
+
+  @@index([userId])
+}
+
+model Concept {
+  id         String   @id @default(cuid())
+  topicId    String
+  topic      Topic    @relation(fields: [topicId], references: [id], onDelete: Cascade)
+  // Stable identifier used in the ontology graph (Concept.id at the domain level).
+  conceptKey String
+  name       String
+  definition String
+  summary    String
+  known      Boolean  @default(false)
+  // Edges where this concept is the prerequisite (`from`) / the dependent (`to`).
+  edgesFrom  Edge[]   @relation("EdgeFrom")
+  edgesTo    Edge[]   @relation("EdgeTo")
+  lectures   Lecture[]
+
+  @@unique([topicId, conceptKey])
+  @@index([topicId])
+}
+
+model Edge {
+  id          String  @id @default(cuid())
+  topicId     String
+  topic       Topic   @relation(fields: [topicId], references: [id], onDelete: Cascade)
+  // from is the prerequisite OF to (DAG only — enforced in app via invariants).
+  fromId      String
+  toId        String
+  fromConcept Concept @relation("EdgeFrom", fields: [fromId], references: [id], onDelete: Cascade)
+  toConcept   Concept @relation("EdgeTo", fields: [toId], references: [id], onDelete: Cascade)
+
+  @@unique([topicId, fromId, toId])
+  @@index([topicId])
+}
+
+model Lecture {
+  id        String   @id @default(cuid())
+  topicId   String
+  topic     Topic    @relation(fields: [topicId], references: [id], onDelete: Cascade)
+  conceptId String
+  concept   Concept  @relation(fields: [conceptId], references: [id], onDelete: Cascade)
+  order     Int
+  markdown  String
+  createdAt DateTime @default(now())
+
+  @@unique([topicId, conceptId])
+  @@index([topicId])
+}
+
+model UserProgress {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  topicId   String
+  topic     Topic    @relation(fields: [topicId], references: [id], onDelete: Cascade)
+  // completedLectureIds as JSON (no String[] in SQLite). App defaults to [].
+  completed Json
+  currentNodeId String?
+  updatedAt DateTime @updatedAt
+
+  @@unique([userId, topicId])
+  @@index([userId])
+}
+
+model AssessmentResult {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  topicId   String
+  topic     Topic    @relation(fields: [topicId], references: [id], onDelete: Cascade)
+  // UserLevel.level as String (no enum): "beginner" | "intermediate" | "advanced"
+  level     String
+  // knownConceptIds + DepthProfile + raw answers as JSON (no scalar arrays).
+  // App supplies values on write (JSON column defaults are not portable to SQLite).
+  knownConceptIds Json
+  depthProfile    Json
+  answers         Json
+  createdAt DateTime @default(now())
+
+  @@unique([userId, topicId])
+  @@index([userId])
+}

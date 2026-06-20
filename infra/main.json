@@ -1,0 +1,562 @@
+{
+  "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+  "contentVersion": "1.0.0.0",
+  "metadata": {
+    "_generator": {
+      "name": "bicep",
+      "version": "0.44.1.10279",
+      "templateHash": "15544967878845212710"
+    }
+  },
+  "parameters": {
+    "namePrefix": {
+      "type": "string",
+      "defaultValue": "kglearn",
+      "metadata": {
+        "description": "Lowercase prefix for all resources."
+      }
+    },
+    "uniqueSuffix": {
+      "type": "string",
+      "defaultValue": "[toLower(take(uniqueString(subscription().id), 6))]",
+      "metadata": {
+        "description": "Deterministic 6-char suffix appended to globally-unique names. Default = lowercase 6-char hash of the subscription id."
+      }
+    },
+    "location": {
+      "type": "string",
+      "defaultValue": "koreacentral",
+      "metadata": {
+        "description": "Region for hosting resources (App Service, Postgres, Key Vault)."
+      }
+    },
+    "foundryLocation": {
+      "type": "string",
+      "defaultValue": "eastus2",
+      "metadata": {
+        "description": "Region for Azure AI Foundry / Azure OpenAI (broad model availability)."
+      }
+    },
+    "appServicePlanSku": {
+      "type": "string",
+      "defaultValue": "B1",
+      "metadata": {
+        "description": "App Service Plan SKU. B1 supports Always On (needed so the Copilot CLI runtime does not cold-start-fail)."
+      }
+    },
+    "nodeVersion": {
+      "type": "string",
+      "defaultValue": "NODE|22-lts",
+      "metadata": {
+        "description": "Linux Node runtime for the Web App."
+      }
+    },
+    "appPort": {
+      "type": "string",
+      "defaultValue": "8080",
+      "metadata": {
+        "description": "HTTP port Next.js listens on (matches startup command and WEBSITES_PORT)."
+      }
+    },
+    "postgresSkuName": {
+      "type": "string",
+      "defaultValue": "Standard_B1ms"
+    },
+    "postgresSkuTier": {
+      "type": "string",
+      "defaultValue": "Burstable"
+    },
+    "postgresVersion": {
+      "type": "string",
+      "defaultValue": "16"
+    },
+    "postgresStorageGb": {
+      "type": "int",
+      "defaultValue": 32
+    },
+    "postgresDatabaseName": {
+      "type": "string",
+      "defaultValue": "kglearn"
+    },
+    "postgresAdminUser": {
+      "type": "string",
+      "defaultValue": "kgadmin"
+    },
+    "postgresAdminPassword": {
+      "type": "securestring",
+      "metadata": {
+        "description": "Postgres admin password. Generated at deploy time (32+ chars) — never hard-coded."
+      }
+    },
+    "foundryAccountName": {
+      "type": "string",
+      "defaultValue": "kglearn-foundry"
+    },
+    "foundrySku": {
+      "type": "string",
+      "defaultValue": "S0"
+    },
+    "foundryModel": {
+      "type": "string",
+      "defaultValue": "gpt-5",
+      "metadata": {
+        "description": "Quality-tier model + deployment name (lectures, assessment) — FOUNDRY_DEPLOYMENT_NAME."
+      }
+    },
+    "foundryDeploymentName": {
+      "type": "string",
+      "defaultValue": "gpt-5"
+    },
+    "foundryModelVersion": {
+      "type": "string",
+      "defaultValue": "",
+      "metadata": {
+        "description": "Quality model version. Empty = service default (latest available in-region)."
+      }
+    },
+    "foundryCapacity": {
+      "type": "int",
+      "defaultValue": 50
+    },
+    "foundryFastModel": {
+      "type": "string",
+      "defaultValue": "gpt-5-mini",
+      "metadata": {
+        "description": "Fast/cost-tier model + deployment name (high-volume research extraction) — FOUNDRY_FAST_DEPLOYMENT_NAME."
+      }
+    },
+    "foundryFastDeploymentName": {
+      "type": "string",
+      "defaultValue": "gpt-5-mini"
+    },
+    "foundryFastModelVersion": {
+      "type": "string",
+      "defaultValue": ""
+    },
+    "foundryFastCapacity": {
+      "type": "int",
+      "defaultValue": 80
+    },
+    "authSecret": {
+      "type": "securestring",
+      "metadata": {
+        "description": "Auth.js secret (openssl rand -base64 32). Generated at deploy."
+      }
+    },
+    "entraClientId": {
+      "type": "string",
+      "defaultValue": "",
+      "metadata": {
+        "description": "Entra ID application (client) id for the OAuth provider. Empty until the app registration is created."
+      }
+    },
+    "entraClientSecret": {
+      "type": "securestring",
+      "defaultValue": "",
+      "metadata": {
+        "description": "Entra ID client secret. Empty until the app registration is created."
+      }
+    },
+    "entraIssuer": {
+      "type": "string",
+      "defaultValue": "",
+      "metadata": {
+        "description": "Entra issuer URL, e.g. https://login.microsoftonline.com/<tenant>/v2.0"
+      }
+    },
+    "tavilyApiKey": {
+      "type": "securestring",
+      "defaultValue": "",
+      "metadata": {
+        "description": "Tavily web-search key. The ONE user-supplied secret. Empty = placeholder; research 401s until filled."
+      }
+    },
+    "adminObjectId": {
+      "type": "string",
+      "defaultValue": "",
+      "metadata": {
+        "description": "Optional AAD object id to grant Key Vault Secrets Officer (so the deployer can read/rotate). Empty = skip."
+      }
+    }
+  },
+  "variables": {
+    "planName": "[format('asp-{0}', parameters('namePrefix'))]",
+    "webAppName": "[format('{0}-web-{1}', parameters('namePrefix'), parameters('uniqueSuffix'))]",
+    "keyVaultName": "[format('{0}-kv-{1}', parameters('namePrefix'), parameters('uniqueSuffix'))]",
+    "postgresName": "[format('{0}-pg-{1}', parameters('namePrefix'), parameters('uniqueSuffix'))]",
+    "foundryName": "[format('{0}-{1}', parameters('foundryAccountName'), parameters('uniqueSuffix'))]",
+    "foundryEndpoint": "[format('https://{0}.openai.azure.com', variables('foundryName'))]",
+    "kvSecretsUserRoleId": "4633458b-17de-408a-b874-0445c86b69e6",
+    "kvSecretsOfficerRoleId": "b86a8fe4-44ce-4948-aa1f-9c2a1f1cd2f0"
+  },
+  "resources": [
+    {
+      "type": "Microsoft.CognitiveServices/accounts",
+      "apiVersion": "2024-10-01",
+      "name": "[variables('foundryName')]",
+      "location": "[parameters('foundryLocation')]",
+      "kind": "AIServices",
+      "sku": {
+        "name": "[parameters('foundrySku')]"
+      },
+      "identity": {
+        "type": "SystemAssigned"
+      },
+      "properties": {
+        "customSubDomainName": "[variables('foundryName')]",
+        "publicNetworkAccess": "Enabled"
+      }
+    },
+    {
+      "type": "Microsoft.CognitiveServices/accounts/deployments",
+      "apiVersion": "2024-10-01",
+      "name": "[format('{0}/{1}', variables('foundryName'), parameters('foundryDeploymentName'))]",
+      "sku": {
+        "name": "GlobalStandard",
+        "capacity": "[parameters('foundryCapacity')]"
+      },
+      "properties": {
+        "model": "[if(empty(parameters('foundryModelVersion')), createObject('format', 'OpenAI', 'name', parameters('foundryModel')), createObject('format', 'OpenAI', 'name', parameters('foundryModel'), 'version', parameters('foundryModelVersion')))]"
+      },
+      "dependsOn": [
+        "[resourceId('Microsoft.CognitiveServices/accounts', variables('foundryName'))]"
+      ]
+    },
+    {
+      "type": "Microsoft.CognitiveServices/accounts/deployments",
+      "apiVersion": "2024-10-01",
+      "name": "[format('{0}/{1}', variables('foundryName'), parameters('foundryFastDeploymentName'))]",
+      "sku": {
+        "name": "GlobalStandard",
+        "capacity": "[parameters('foundryFastCapacity')]"
+      },
+      "properties": {
+        "model": "[if(empty(parameters('foundryFastModelVersion')), createObject('format', 'OpenAI', 'name', parameters('foundryFastModel')), createObject('format', 'OpenAI', 'name', parameters('foundryFastModel'), 'version', parameters('foundryFastModelVersion')))]"
+      },
+      "dependsOn": [
+        "[resourceId('Microsoft.CognitiveServices/accounts', variables('foundryName'))]",
+        "[resourceId('Microsoft.CognitiveServices/accounts/deployments', variables('foundryName'), parameters('foundryDeploymentName'))]"
+      ]
+    },
+    {
+      "type": "Microsoft.DBforPostgreSQL/flexibleServers",
+      "apiVersion": "2024-08-01",
+      "name": "[variables('postgresName')]",
+      "location": "[parameters('location')]",
+      "sku": {
+        "name": "[parameters('postgresSkuName')]",
+        "tier": "[parameters('postgresSkuTier')]"
+      },
+      "properties": {
+        "version": "[parameters('postgresVersion')]",
+        "administratorLogin": "[parameters('postgresAdminUser')]",
+        "administratorLoginPassword": "[parameters('postgresAdminPassword')]",
+        "storage": {
+          "storageSizeGB": "[parameters('postgresStorageGb')]"
+        },
+        "backup": {
+          "backupRetentionDays": 7,
+          "geoRedundantBackup": "Disabled"
+        },
+        "highAvailability": {
+          "mode": "Disabled"
+        },
+        "network": {
+          "publicNetworkAccess": "Enabled"
+        }
+      }
+    },
+    {
+      "type": "Microsoft.DBforPostgreSQL/flexibleServers/databases",
+      "apiVersion": "2024-08-01",
+      "name": "[format('{0}/{1}', variables('postgresName'), parameters('postgresDatabaseName'))]",
+      "properties": {
+        "charset": "UTF8",
+        "collation": "en_US.utf8"
+      },
+      "dependsOn": [
+        "[resourceId('Microsoft.DBforPostgreSQL/flexibleServers', variables('postgresName'))]"
+      ]
+    },
+    {
+      "type": "Microsoft.DBforPostgreSQL/flexibleServers/firewallRules",
+      "apiVersion": "2024-08-01",
+      "name": "[format('{0}/{1}', variables('postgresName'), 'AllowAllAzureServices')]",
+      "properties": {
+        "startIpAddress": "0.0.0.0",
+        "endIpAddress": "0.0.0.0"
+      },
+      "dependsOn": [
+        "[resourceId('Microsoft.DBforPostgreSQL/flexibleServers', variables('postgresName'))]"
+      ]
+    },
+    {
+      "type": "Microsoft.KeyVault/vaults",
+      "apiVersion": "2024-11-01",
+      "name": "[variables('keyVaultName')]",
+      "location": "[parameters('location')]",
+      "properties": {
+        "tenantId": "[subscription().tenantId]",
+        "sku": {
+          "family": "A",
+          "name": "standard"
+        },
+        "enableRbacAuthorization": true,
+        "enableSoftDelete": true,
+        "softDeleteRetentionInDays": 7,
+        "publicNetworkAccess": "Enabled"
+      }
+    },
+    {
+      "type": "Microsoft.KeyVault/vaults/secrets",
+      "apiVersion": "2024-11-01",
+      "name": "[format('{0}/{1}', variables('keyVaultName'), 'AZURE-AI-FOUNDRY-API-KEY')]",
+      "properties": {
+        "value": "[listKeys(resourceId('Microsoft.CognitiveServices/accounts', variables('foundryName')), '2024-10-01').key1]"
+      },
+      "dependsOn": [
+        "[resourceId('Microsoft.CognitiveServices/accounts', variables('foundryName'))]",
+        "[resourceId('Microsoft.KeyVault/vaults', variables('keyVaultName'))]"
+      ]
+    },
+    {
+      "type": "Microsoft.KeyVault/vaults/secrets",
+      "apiVersion": "2024-11-01",
+      "name": "[format('{0}/{1}', variables('keyVaultName'), 'DATABASE-URL')]",
+      "properties": {
+        "value": "[format('postgresql://{0}:{1}@{2}:5432/{3}?sslmode=require', parameters('postgresAdminUser'), parameters('postgresAdminPassword'), reference(resourceId('Microsoft.DBforPostgreSQL/flexibleServers', variables('postgresName')), '2024-08-01').fullyQualifiedDomainName, parameters('postgresDatabaseName'))]"
+      },
+      "dependsOn": [
+        "[resourceId('Microsoft.KeyVault/vaults', variables('keyVaultName'))]",
+        "[resourceId('Microsoft.DBforPostgreSQL/flexibleServers', variables('postgresName'))]"
+      ]
+    },
+    {
+      "type": "Microsoft.KeyVault/vaults/secrets",
+      "apiVersion": "2024-11-01",
+      "name": "[format('{0}/{1}', variables('keyVaultName'), 'AUTH-SECRET')]",
+      "properties": {
+        "value": "[parameters('authSecret')]"
+      },
+      "dependsOn": [
+        "[resourceId('Microsoft.KeyVault/vaults', variables('keyVaultName'))]"
+      ]
+    },
+    {
+      "type": "Microsoft.KeyVault/vaults/secrets",
+      "apiVersion": "2024-11-01",
+      "name": "[format('{0}/{1}', variables('keyVaultName'), 'TAVILY-API-KEY')]",
+      "properties": {
+        "value": "[if(empty(parameters('tavilyApiKey')), 'REPLACE_ME_TAVILY_API_KEY', parameters('tavilyApiKey'))]"
+      },
+      "dependsOn": [
+        "[resourceId('Microsoft.KeyVault/vaults', variables('keyVaultName'))]"
+      ]
+    },
+    {
+      "type": "Microsoft.KeyVault/vaults/secrets",
+      "apiVersion": "2024-11-01",
+      "name": "[format('{0}/{1}', variables('keyVaultName'), 'AUTH-MICROSOFT-ENTRA-ID-SECRET')]",
+      "properties": {
+        "value": "[if(empty(parameters('entraClientSecret')), 'REPLACE_ME_ENTRA_CLIENT_SECRET', parameters('entraClientSecret'))]"
+      },
+      "dependsOn": [
+        "[resourceId('Microsoft.KeyVault/vaults', variables('keyVaultName'))]"
+      ]
+    },
+    {
+      "type": "Microsoft.Web/serverfarms",
+      "apiVersion": "2024-04-01",
+      "name": "[variables('planName')]",
+      "location": "[parameters('location')]",
+      "sku": {
+        "name": "[parameters('appServicePlanSku')]"
+      },
+      "kind": "linux",
+      "properties": {
+        "reserved": true
+      }
+    },
+    {
+      "type": "Microsoft.Web/sites",
+      "apiVersion": "2024-04-01",
+      "name": "[variables('webAppName')]",
+      "location": "[parameters('location')]",
+      "identity": {
+        "type": "SystemAssigned"
+      },
+      "properties": {
+        "serverFarmId": "[resourceId('Microsoft.Web/serverfarms', variables('planName'))]",
+        "httpsOnly": true,
+        "siteConfig": {
+          "linuxFxVersion": "[parameters('nodeVersion')]",
+          "alwaysOn": true,
+          "webSocketsEnabled": true,
+          "ftpsState": "Disabled",
+          "minTlsVersion": "1.2",
+          "http20Enabled": true,
+          "appCommandLine": "[format('npx next start -p {0}', parameters('appPort'))]",
+          "healthCheckPath": "/api/health",
+          "appSettings": [
+            {
+              "name": "WEBSITES_PORT",
+              "value": "[parameters('appPort')]"
+            },
+            {
+              "name": "PORT",
+              "value": "[parameters('appPort')]"
+            },
+            {
+              "name": "NODE_ENV",
+              "value": "production"
+            },
+            {
+              "name": "WEBSITE_NODE_DEFAULT_VERSION",
+              "value": "22-lts"
+            },
+            {
+              "name": "SCM_DO_BUILD_DURING_DEPLOYMENT",
+              "value": "false"
+            },
+            {
+              "name": "WEBSITES_CONTAINER_START_TIME_LIMIT",
+              "value": "600"
+            },
+            {
+              "name": "COPILOT_HOME",
+              "value": "/tmp/copilot"
+            },
+            {
+              "name": "AZURE_AI_FOUNDRY_ENDPOINT",
+              "value": "[variables('foundryEndpoint')]"
+            },
+            {
+              "name": "AZURE_AI_FOUNDRY_API_KEY",
+              "value": "[format('{0}{1})', format('@Microsoft.KeyVault(SecretUri={0}secrets/', reference(resourceId('Microsoft.KeyVault/vaults', variables('keyVaultName')), '2024-11-01').vaultUri), 'AZURE-AI-FOUNDRY-API-KEY')]"
+            },
+            {
+              "name": "FOUNDRY_DEPLOYMENT_NAME",
+              "value": "[parameters('foundryDeploymentName')]"
+            },
+            {
+              "name": "FOUNDRY_FAST_DEPLOYMENT_NAME",
+              "value": "[parameters('foundryFastDeploymentName')]"
+            },
+            {
+              "name": "DATABASE_URL",
+              "value": "[format('{0}{1})', format('@Microsoft.KeyVault(SecretUri={0}secrets/', reference(resourceId('Microsoft.KeyVault/vaults', variables('keyVaultName')), '2024-11-01').vaultUri), 'DATABASE-URL')]"
+            },
+            {
+              "name": "AUTH_SECRET",
+              "value": "[format('{0}{1})', format('@Microsoft.KeyVault(SecretUri={0}secrets/', reference(resourceId('Microsoft.KeyVault/vaults', variables('keyVaultName')), '2024-11-01').vaultUri), 'AUTH-SECRET')]"
+            },
+            {
+              "name": "AUTH_TRUST_HOST",
+              "value": "true"
+            },
+            {
+              "name": "AUTH_URL",
+              "value": "[format('https://{0}.azurewebsites.net', variables('webAppName'))]"
+            },
+            {
+              "name": "AUTH_MICROSOFT_ENTRA_ID_ID",
+              "value": "[parameters('entraClientId')]"
+            },
+            {
+              "name": "AUTH_MICROSOFT_ENTRA_ID_SECRET",
+              "value": "[format('{0}{1})', format('@Microsoft.KeyVault(SecretUri={0}secrets/', reference(resourceId('Microsoft.KeyVault/vaults', variables('keyVaultName')), '2024-11-01').vaultUri), 'AUTH-MICROSOFT-ENTRA-ID-SECRET')]"
+            },
+            {
+              "name": "AUTH_MICROSOFT_ENTRA_ID_ISSUER",
+              "value": "[parameters('entraIssuer')]"
+            },
+            {
+              "name": "TAVILY_API_KEY",
+              "value": "[format('{0}{1})', format('@Microsoft.KeyVault(SecretUri={0}secrets/', reference(resourceId('Microsoft.KeyVault/vaults', variables('keyVaultName')), '2024-11-01').vaultUri), 'TAVILY-API-KEY')]"
+            }
+          ]
+        }
+      },
+      "dependsOn": [
+        "[resourceId('Microsoft.KeyVault/vaults', variables('keyVaultName'))]",
+        "[resourceId('Microsoft.Web/serverfarms', variables('planName'))]",
+        "[resourceId('Microsoft.KeyVault/vaults/secrets', variables('keyVaultName'), 'AUTH-SECRET')]",
+        "[resourceId('Microsoft.KeyVault/vaults/secrets', variables('keyVaultName'), 'DATABASE-URL')]",
+        "[resourceId('Microsoft.KeyVault/vaults/secrets', variables('keyVaultName'), 'AUTH-MICROSOFT-ENTRA-ID-SECRET')]",
+        "[resourceId('Microsoft.KeyVault/vaults/secrets', variables('keyVaultName'), 'AZURE-AI-FOUNDRY-API-KEY')]",
+        "[resourceId('Microsoft.KeyVault/vaults/secrets', variables('keyVaultName'), 'TAVILY-API-KEY')]"
+      ]
+    },
+    {
+      "type": "Microsoft.Authorization/roleAssignments",
+      "apiVersion": "2022-04-01",
+      "scope": "[resourceId('Microsoft.KeyVault/vaults', variables('keyVaultName'))]",
+      "name": "[guid(resourceId('Microsoft.KeyVault/vaults', variables('keyVaultName')), resourceId('Microsoft.Web/sites', variables('webAppName')), variables('kvSecretsUserRoleId'))]",
+      "properties": {
+        "roleDefinitionId": "[subscriptionResourceId('Microsoft.Authorization/roleDefinitions', variables('kvSecretsUserRoleId'))]",
+        "principalId": "[reference(resourceId('Microsoft.Web/sites', variables('webAppName')), '2024-04-01', 'full').identity.principalId]",
+        "principalType": "ServicePrincipal"
+      },
+      "dependsOn": [
+        "[resourceId('Microsoft.KeyVault/vaults', variables('keyVaultName'))]",
+        "[resourceId('Microsoft.Web/sites', variables('webAppName'))]"
+      ]
+    },
+    {
+      "condition": "[not(empty(parameters('adminObjectId')))]",
+      "type": "Microsoft.Authorization/roleAssignments",
+      "apiVersion": "2022-04-01",
+      "scope": "[resourceId('Microsoft.KeyVault/vaults', variables('keyVaultName'))]",
+      "name": "[guid(resourceId('Microsoft.KeyVault/vaults', variables('keyVaultName')), parameters('adminObjectId'), variables('kvSecretsOfficerRoleId'))]",
+      "properties": {
+        "roleDefinitionId": "[subscriptionResourceId('Microsoft.Authorization/roleDefinitions', variables('kvSecretsOfficerRoleId'))]",
+        "principalId": "[parameters('adminObjectId')]"
+      },
+      "dependsOn": [
+        "[resourceId('Microsoft.KeyVault/vaults', variables('keyVaultName'))]"
+      ]
+    }
+  ],
+  "outputs": {
+    "webAppName": {
+      "type": "string",
+      "value": "[variables('webAppName')]"
+    },
+    "webAppHost": {
+      "type": "string",
+      "value": "[format('{0}.azurewebsites.net', variables('webAppName'))]"
+    },
+    "webAppUrl": {
+      "type": "string",
+      "value": "[format('https://{0}.azurewebsites.net', variables('webAppName'))]"
+    },
+    "entraRedirectUri": {
+      "type": "string",
+      "value": "[format('https://{0}.azurewebsites.net/api/auth/callback/microsoft-entra-id', variables('webAppName'))]"
+    },
+    "keyVaultName": {
+      "type": "string",
+      "value": "[variables('keyVaultName')]"
+    },
+    "foundryEndpoint": {
+      "type": "string",
+      "value": "[variables('foundryEndpoint')]"
+    },
+    "foundryName": {
+      "type": "string",
+      "value": "[variables('foundryName')]"
+    },
+    "postgresFqdn": {
+      "type": "string",
+      "value": "[reference(resourceId('Microsoft.DBforPostgreSQL/flexibleServers', variables('postgresName')), '2024-08-01').fullyQualifiedDomainName]"
+    },
+    "resourceGroup": {
+      "type": "string",
+      "value": "[resourceGroup().name]"
+    },
+    "uniqueSuffix": {
+      "type": "string",
+      "value": "[parameters('uniqueSuffix')]"
+    }
+  }
+}

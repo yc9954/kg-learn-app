@@ -1,0 +1,94 @@
+{
+  "$comment": "Pre-set Azure deployment defaults so `deploy` runs in one shot. The azure-deployer agent MUST read this file and use these values WITHOUT asking the user. The only interactive step allowed is `az login` if no subscription is active; everything else is fixed here. Override a value only if the user explicitly asks.",
+
+  "subscription": {
+    "id": "AUTO",
+    "$comment": "AUTO = detect via `az account show --query id -o tsv`. If not logged in, run `az login` once, then re-detect. Never hard-code a subscription id."
+  },
+
+  "naming": {
+    "prefix": "kglearn",
+    "resourceGroup": "rg-kglearn",
+    "uniqueSuffixStrategy": "lowercase 6-char hash of the subscription id; append to globally-unique names (web app, Key Vault, Postgres, Foundry, ACR) as <name>-<suffix>",
+    "$comment": "App/Key Vault/Postgres/Foundry names are globally unique, so append the deterministic suffix. RG and plan names need not be globally unique."
+  },
+
+  "location": {
+    "hosting": "koreacentral",
+    "foundry": "eastus2",
+    "$comment": "Hosting in koreacentral (low latency for the user). Azure AI Foundry / Azure OpenAI in eastus2 for broad model availability; cross-region calls to Foundry are fine. If gpt-4o-mini is unavailable in eastus2 at deploy time, fall back to swedencentral, then westus."
+  },
+
+  "compute": {
+    "preferred": "appservice",
+    "fallback": "containerapps",
+    "appService": {
+      "planSku": "B1",
+      "alwaysOn": true,
+      "webSockets": true,
+      "nodeVersion": "22-lts",
+      "startupCommand": "npx next start -p 8080",
+      "appSettings": { "WEBSITES_PORT": "8080" }
+    },
+    "$comment": "Default App Service (Linux, Node 22). B1 supports Always On (needed so the Copilot CLI runtime doesn't cold-start-fail). If the in-process Copilot SDK spawn fails the ai-health probe, switch to containerapps with the CLI as a TCP sidecar + Azure Files volume for COPILOT_HOME."
+  },
+
+  "database": {
+    "engine": "postgresql",
+    "kind": "flexibleServer",
+    "tier": "Burstable",
+    "sku": "Standard_B1ms",
+    "version": "16",
+    "storageGb": 32,
+    "databaseName": "kglearn",
+    "adminUser": "kgadmin",
+    "$comment": "Production Postgres. Admin password is generated at deploy time (32+ chars) and stored in Key Vault; CI sets DATABASE_URL from it. Local dev still uses SQLite. Allow Azure services + the App Service outbound IPs through the firewall."
+  },
+
+  "foundry": {
+    "accountKind": "AIServices",
+    "accountSku": "S0",
+    "accountName": "kglearn-foundry",
+    "model": "gpt-5",
+    "deploymentName": "gpt-5",
+    "modelVersion": "AUTO",
+    "deploymentSku": "GlobalStandard",
+    "capacity": 50,
+    "fastModel": "gpt-5-mini",
+    "fastDeploymentName": "gpt-5-mini",
+    "fastCapacity": 80,
+    "$comment": "The GitHub Copilot SDK BYOK backend, upgraded to GPT-5. Create TWO model deployments: the quality tier `gpt-5` (lectures, assessment — FOUNDRY_DEPLOYMENT_NAME) and the cost/speed tier `gpt-5-mini` (high-volume research extraction across parallel agents — FOUNDRY_FAST_DEPLOYMENT_NAME). modelVersion AUTO = latest available version in-region. The app wires each as provider:{type:'openai', baseUrl:'<endpoint>/openai/v1/', apiKey, wireApi:'responses'} + model = the deployment name. If gpt-5 is unavailable in-region, fall back in order: gpt-5.1 -> gpt-5-chat -> gpt-4.1 (and the fast tier: gpt-5-mini -> gpt-4.1-mini). Want the absolute top tier? swap `model` to gpt-5-pro or gpt-5.2 (higher cost/latency)."
+  },
+
+  "keyVault": {
+    "enabled": true,
+    "name": "kglearn-kv",
+    "$comment": "Holds the Foundry API key, Postgres admin password, AUTH_SECRET, and the search-provider key. App Settings reference Key Vault secrets. Name gets the unique suffix."
+  },
+
+  "auth": {
+    "provider": "entra-id",
+    "autoSecret": true,
+    "$comment": "AUTH_SECRET auto-generated at deploy. Default provider Entra ID: the agent creates an Entra app registration via `az ad app create`, sets the redirect URI to https://<webapp-host>/api/auth/callback/microsoft-entra-id, and stores client id/secret in Key Vault. If the user lacks Entra app-registration permission, fall back to a GitHub OAuth provider and surface that one app-registration step."
+  },
+
+  "search": {
+    "provider": "tavily",
+    "envVar": "TAVILY_API_KEY",
+    "$comment": "Web-search provider for research-engine (exempt from the Azure-only rule). This is the ONE secret the user must supply (no Azure resource creates it). If absent at deploy time, deploy everything else and leave TAVILY_API_KEY as a clearly-flagged placeholder App Setting; research will 401 until it is filled. Alternatively switch to Azure Grounding-with-Bing to keep it on Azure."
+  },
+
+  "cicd": {
+    "branch": "main",
+    "workflowFile": ".github/workflows/deploy.yml",
+    "auth": "oidc",
+    "gates": ["forward-ref-0 test", "ai-health (Azure Foundry base_url) assertion"],
+    "$comment": "GitHub Actions deploys on push to main via OIDC (federated credential created by the agent). CI flips Prisma to postgresql, runs `prisma migrate deploy`, runs the keystone test, deploys, then runs the post-deploy ai-health gate. A failing gate blocks release."
+  },
+
+  "manualStepsAllowed": [
+    "az login (one interactive browser auth if no active subscription)",
+    "supply TAVILY_API_KEY (only if web search should work at first deploy)"
+  ],
+  "$finalComment": "Everything not in manualStepsAllowed is pre-decided here. The deploy agent provisions, wires secrets, sets up CI, and reports the public URL without further questions."
+}

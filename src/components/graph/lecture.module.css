@@ -1,0 +1,112 @@
+.panel {
+  margin-top: 1.25rem;
+  border: 1px solid var(--kg-border, #e2e8f0);
+  border-radius: 12px;
+  background: var(--kg-surface, #ffffff);
+  overflow: hidden;
+}
+
+.bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 0.75rem 1rem;
+  border-bottom: 1px solid var(--kg-border, #e2e8f0);
+  background: var(--kg-surface-2, #f8fafc);
+}
+
+.meta {
+  display: flex;
+  align-items: baseline;
+  gap: 0.6rem;
+}
+
+.progress {
+  font-size: 0.85rem;
+  color: var(--kg-muted, #64748b);
+}
+
+.actions {
+  display: flex;
+  gap: 0.5rem;
+}
+
+.primary,
+.ghost {
+  font: inherit;
+  font-size: 0.9rem;
+  padding: 0.45rem 0.9rem;
+  border-radius: 8px;
+  cursor: pointer;
+  border: 1px solid transparent;
+}
+
+.primary {
+  background: var(--kg-accent, #4f46e5);
+  color: #fff;
+}
+
+.primary:disabled {
+  opacity: 0.6;
+  cursor: progress;
+}
+
+.ghost {
+  background: transparent;
+  border-color: var(--kg-border, #cbd5e1);
+  color: var(--kg-text, #1e293b);
+}
+
+.error {
+  margin: 0;
+  padding: 0.6rem 1rem;
+  color: #b91c1c;
+  background: #fef2f2;
+  font-size: 0.9rem;
+}
+
+.body {
+  padding: 1.1rem 1.25rem 1.5rem;
+  max-height: 60vh;
+  overflow: auto;
+}
+
+.hint,
+.complete {
+  color: var(--kg-muted, #64748b);
+  font-size: 0.95rem;
+  line-height: 1.5;
+}
+
+.complete {
+  color: var(--kg-text, #1e293b);
+}
+
+/* Lecture content rhythm. */
+.body :global(.lecture) {
+  line-height: 1.6;
+}
+
+.body :global(.lecture h2) {
+  margin-top: 0;
+}
+
+.body :global(.lecture pre) {
+  background: #0f172a;
+  color: #e2e8f0;
+  padding: 0.85rem 1rem;
+  border-radius: 8px;
+  overflow-x: auto;
+}
+
+.body :global(.lecture .lecture-mermaid) {
+  display: flex;
+  justify-content: center;
+  margin: 1rem 0;
+}
+
+.body :global(.lecture .lecture-mermaid svg) {
+  max-width: 100%;
+  height: auto;
+}

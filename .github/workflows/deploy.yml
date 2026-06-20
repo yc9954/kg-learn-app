@@ -1,0 +1,172 @@
+# =============================================================================
+# Deploy the Knowledge-Graph Learning App to Azure App Service (AC-13).
+#
+# On every push to `main`:
+#   1. install deps
+#   2. flip Prisma datasource to PostgreSQL (scripts/set-db-provider.mjs)
+#   3. FORWARD-REF-0 keystone gate (AC-9) + full offline test suite — a failure
+#      here BLOCKS the release
+#   4. typecheck
+#   5. Azure login (OIDC — no publish-profile secrets) and resolve runtime
+#      secrets from Key Vault (DATABASE_URL, Foundry endpoint + key)
+#   6. build (next build) — runs in production mode, so the Foundry env resolved
+#      in step 5 must be present (CopilotProvider throws in prod without it)
+#   7. apply DB migrations to Azure Postgres (prisma migrate deploy)
+#   8. deploy to App Service (zip)
+#   9. POST-DEPLOY GATES (release blockers):
+#        - /api/health responds
+#        - /api/ai-health confirms the live model base_url is the AZURE AI
+#          FOUNDRY endpoint (fails if GitHub-hosted / non-Azure) — PRD §4.2/§4.4
+#
+# Required GitHub config (see infra/README.md):
+#   secrets: AZURE_CLIENT_ID, AZURE_TENANT_ID, AZURE_SUBSCRIPTION_ID
+#   vars:    AZURE_RESOURCE_GROUP, AZURE_WEBAPP_NAME, AZURE_KEYVAULT_NAME,
+#            FOUNDRY_DEPLOYMENT_NAME, FOUNDRY_FAST_DEPLOYMENT_NAME
+# The OIDC service principal needs "Key Vault Secrets User" on the vault and
+# deploy rights (e.g. Website Contributor) on the resource group.
+# =============================================================================
+name: Deploy to Azure
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  id-token: write   # OIDC federated login to Azure
+  contents: read
+
+concurrency:
+  group: deploy-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    environment: production
+    env:
+      AZURE_RESOURCE_GROUP: ${{ vars.AZURE_RESOURCE_GROUP }}
+      AZURE_WEBAPP_NAME: ${{ vars.AZURE_WEBAPP_NAME }}
+      AZURE_KEYVAULT_NAME: ${{ vars.AZURE_KEYVAULT_NAME }}
+      FOUNDRY_DEPLOYMENT_NAME: ${{ vars.FOUNDRY_DEPLOYMENT_NAME }}
+      FOUNDRY_FAST_DEPLOYMENT_NAME: ${{ vars.FOUNDRY_FAST_DEPLOYMENT_NAME }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+        env:
+          # postinstall runs `prisma generate`; prisma.config.ts requires a
+          # resolvable DATABASE_URL. Real value is pulled from Key Vault later.
+          DATABASE_URL: "postgresql://placeholder:placeholder@localhost:5432/kglearn"
+
+      - name: Switch Prisma datasource to PostgreSQL (prod)
+        run: node scripts/set-db-provider.mjs postgresql
+
+      - name: Generate Prisma client
+        run: npx prisma generate
+        env:
+          # Provider line is already postgresql; a syntactically-valid URL lets
+          # prisma.config.ts resolve. Real URL is pulled from Key Vault below.
+          DATABASE_URL: "postgresql://placeholder:placeholder@localhost:5432/kglearn"
+
+      # ---- KEYSTONE GATE: forward-ref-0 (AC-9), explicit + full suite ---------
+      - name: Forward-reference-0 keystone gate (AC-9)
+        run: npm run test:lectures
+
+      - name: Full test suite
+        run: npm test
+
+      - name: Typecheck
+        run: npm run typecheck
+
+      # ---- Azure login + resolve runtime secrets from Key Vault ---------------
+      - name: Azure login (OIDC)
+        uses: azure/login@v2
+        with:
+          client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+
+      - name: Resolve secrets from Key Vault
+        run: |
+          set -euo pipefail
+          KV="$AZURE_KEYVAULT_NAME"
+          DB_URL=$(az keyvault secret show --vault-name "$KV" --name DATABASE-URL --query value -o tsv)
+          FOUNDRY_KEY=$(az keyvault secret show --vault-name "$KV" --name AZURE-AI-FOUNDRY-API-KEY --query value -o tsv)
+          # Foundry endpoint from the deployed Web App settings (single source of truth).
+          FOUNDRY_ENDPOINT=$(az webapp config appsettings list \
+            --resource-group "$AZURE_RESOURCE_GROUP" --name "$AZURE_WEBAPP_NAME" \
+            --query "[?name=='AZURE_AI_FOUNDRY_ENDPOINT'].value | [0]" -o tsv)
+          echo "::add-mask::$DB_URL"
+          echo "::add-mask::$FOUNDRY_KEY"
+          {
+            echo "DATABASE_URL=$DB_URL"
+            echo "AZURE_AI_FOUNDRY_API_KEY=$FOUNDRY_KEY"
+            echo "AZURE_AI_FOUNDRY_ENDPOINT=$FOUNDRY_ENDPOINT"
+          } >> "$GITHUB_ENV"
+
+      # ---- Build (production mode — needs Foundry + DB env from above) --------
+      - name: Build
+        run: npm run build
+
+      - name: Apply Prisma migrations
+        run: npx prisma migrate deploy
+
+      # ---- Deploy to Azure App Service ----------------------------------------
+      - name: Prepare deployment package
+        run: |
+          npm prune --omit=dev
+          npx prisma generate
+          zip -qr app.zip . -x ".git/*" ".github/*" "*.next/cache/*"
+
+      - name: Deploy web app zip
+        run: |
+          az webapp deploy \
+            --resource-group "$AZURE_RESOURCE_GROUP" \
+            --name "$AZURE_WEBAPP_NAME" \
+            --src-path app.zip \
+            --type zip \
+            --restart true
+
+      # ---- POST-DEPLOY GATES (release blockers) -------------------------------
+      - name: Health gate (/api/health)
+        run: |
+          set -euo pipefail
+          BASE="https://${AZURE_WEBAPP_NAME}.azurewebsites.net"
+          echo "Waiting for $BASE/api/health ..."
+          for i in $(seq 1 30); do
+            code=$(curl -s -o /dev/null -w "%{http_code}" "$BASE/api/health" || true)
+            if [ "$code" = "200" ]; then echo "health OK"; exit 0; fi
+            echo "attempt $i: HTTP $code — retry in 10s"; sleep 10
+          done
+          echo "::error::/api/health did not return 200 in time"; exit 1
+
+      - name: AI-health gate — live base_url MUST be Azure AI Foundry
+        run: |
+          set -euo pipefail
+          BASE="https://${AZURE_WEBAPP_NAME}.azurewebsites.net"
+          echo "Probing $BASE/api/ai-health (spawns Copilot runtime + round-trip) ..."
+          body=""
+          for i in $(seq 1 30); do
+            body=$(curl -s --max-time 60 "$BASE/api/ai-health" || true)
+            if echo "$body" | grep -q '"status":"ok"'; then break; fi
+            echo "attempt $i: not ready — retry in 10s"; sleep 10
+          done
+          echo "ai-health response: $body"
+          echo "$body" | grep -q '"status":"ok"' \
+            || { echo "::error::ai-health not ok"; exit 1; }
+          echo "$body" | grep -q '"azureBacked":true' \
+            || { echo "::error::live model base_url is NOT an Azure Foundry endpoint — blocking release"; exit 1; }
+          if echo "$body" | grep -qi 'github'; then
+            echo "::error::ai-health base_url references a GitHub-hosted model — blocking release"; exit 1
+          fi
+          echo "AI-health gate passed — backend confirmed Azure AI Foundry."
