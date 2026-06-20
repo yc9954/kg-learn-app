@@ -200,7 +200,7 @@ export default function LearnExperience() {
             <span className={styles.navIcon}>▤</span>
             Lectures
           </button>
-          <a className={styles.navItem} href="/examples/transformers">
+          <a className={styles.navItem} href="/examples">
             <span className={styles.navIcon}>❖</span>
             Examples
           </a>
