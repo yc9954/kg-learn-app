@@ -108,18 +108,6 @@ export default function GraphCanvas({
       if (evt.target === cy) onSelectRef.current(null);
     });
 
-    // Hover → highlight the node + its prerequisite chain (incoming edges).
-    cy.on("mouseover", "node", (evt) => {
-      const node = evt.target as NodeSingular;
-      const prereqs = node.predecessors(); // upstream prerequisites + their edges
-      const hood = node.union(prereqs);
-      cy.elements().addClass("dimmed");
-      hood.removeClass("dimmed").addClass("highlight");
-    });
-    cy.on("mouseout", "node", () => {
-      cy.elements().removeClass("dimmed").removeClass("highlight");
-    });
-
     return () => {
       if (layoutTimer.current) clearTimeout(layoutTimer.current);
       cy.destroy();

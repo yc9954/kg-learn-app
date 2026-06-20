@@ -18,6 +18,11 @@
 
 import { useEffect, useMemo, useState } from "react";
 import dynamic from "next/dynamic";
+import ReactMarkdown from "react-markdown";
+import remarkGfm from "remark-gfm";
+import remarkMath from "remark-math";
+import rehypeKatex from "rehype-katex";
+import "katex/dist/katex.min.css";
 import type { Concept, KnowledgeGraph } from "@/lib/ontology/types";
 import { useGraphStream } from "@/lib/graph/useGraphStream";
 import GraphCanvas from "./GraphCanvas";
@@ -234,10 +239,24 @@ function DetailPanel({
       {concept.known && <span className={styles.panelTag}>already known</span>}
 
       <div className={styles.panelLabel}>Definition</div>
-      <p className={styles.panelText}>{concept.definition || "—"}</p>
+      <div className={styles.panelText}>
+        <ReactMarkdown
+          remarkPlugins={[remarkGfm, remarkMath]}
+          rehypePlugins={[rehypeKatex]}
+        >
+          {concept.definition || "—"}
+        </ReactMarkdown>
+      </div>
 
       <div className={styles.panelLabel}>Summary</div>
-      <p className={styles.panelText}>{concept.summary || "—"}</p>
+      <div className={styles.panelText}>
+        <ReactMarkdown
+          remarkPlugins={[remarkGfm, remarkMath]}
+          rehypePlugins={[rehypeKatex]}
+        >
+          {concept.summary || "—"}
+        </ReactMarkdown>
+      </div>
 
       {sources && sources.length > 0 && (
         <>

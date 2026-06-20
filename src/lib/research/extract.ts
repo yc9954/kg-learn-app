@@ -116,8 +116,16 @@ Rules:
 - A prerequisite edge {"from","to"} means: you must learn "from" BEFORE "to".
 - Never create cycles (the graph must be a DAG).
 - Prefer reusing the EXACT names of concepts already in the graph.
-- Keep concept names short noun phrases (2-5 words). Definitions are 1 sentence;
-  summaries are 1-2 sentences.`;
+- BE SPECIFIC AND GRANULAR. Extract concrete, named ideas — specific theorems,
+  algorithms, equations, techniques, mechanisms, named methods, and key terms —
+  NOT broad umbrella categories. A good node is something a single lecture could
+  define precisely (e.g. "Scaled dot-product attention", "Bayes' rule",
+  "Reparameterization trick", "Bellman equation"), NOT a vague field name
+  (e.g. "Math", "Deep learning", "Statistics", "Theory").
+- If a concept is broad, DECOMPOSE it into its specific sub-concepts and wire the
+  prerequisite edges between them.
+- Keep concept names short, specific noun phrases (2-6 words). Definitions are 1
+  precise sentence naming the actual idea; summaries are 1-2 sentences.`;
 
 type RawConcept = {
   name?: string;
@@ -161,7 +169,10 @@ Return JSON shaped exactly:
   "edges": [{"from": concept-name, "to": concept-name}]
 }
 Include both brand-new concepts AND edges connecting new concepts to each other
-and to existing ones. Aim for high-signal prerequisites, not exhaustive links.`;
+and to existing ones. Aim for high-signal prerequisites, not exhaustive links.
+Favour SPECIFIC, concrete concepts (named methods, equations, theorems,
+algorithms, mechanisms, key terms) over broad categories — decompose any vague
+"field" node into the precise sub-concepts a learner actually studies.`;
 }
 
 /** Tolerant JSON extraction: handles fenced blocks and surrounding prose. */

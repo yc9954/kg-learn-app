@@ -30,7 +30,46 @@ function note(conceptId: string, title: string, markdown: string): ExampleNote {
   return { conceptId, title, markdown };
 }
 
-export const EXAMPLE_PROJECTS: ExampleProject[] = [
+/**
+ * Turn the rich note markdown into a short, plain-text first sentence so a
+ * clicked node can show a concise definition (the full markdown becomes the
+ * node summary, rendered with LaTeX in the detail panel).
+ */
+function firstSentence(markdown: string): string {
+  const plain = markdown
+    .replace(/\$([^$]+)\$/g, "$1")
+    .replace(/\*\*([^*]+)\*\*/g, "$1")
+    .replace(/\*([^*]+)\*/g, "$1")
+    .replace(/`([^`]+)`/g, "$1")
+    .replace(/\\[a-zA-Z]+/g, "")
+    .replace(/[{}\\]/g, "")
+    .replace(/\s+/g, " ")
+    .trim();
+  const m = plain.match(/^.*?[.!?](\s|$)/);
+  return (m ? m[0] : plain).trim();
+}
+
+/**
+ * Backfill each node's `definition` + `summary` from its matching lecture note
+ * so clicking a node in an example graph opens a real, detailed description.
+ */
+function withNodeDetails(p: ExampleProject): ExampleProject {
+  const byId = new Map(p.notes.map((n) => [n.conceptId, n]));
+  return {
+    ...p,
+    nodes: p.nodes.map((n) => {
+      const note = byId.get(n.id);
+      if (!note) return n;
+      return {
+        ...n,
+        definition: n.definition || firstSentence(note.markdown),
+        summary: n.summary || note.markdown,
+      };
+    }),
+  };
+}
+
+const RAW_PROJECTS: ExampleProject[] = [
   {
     id: "diffusion-models",
     title: "Diffusion Models",
@@ -250,3 +289,6 @@ export const EXAMPLE_PROJECTS: ExampleProject[] = [
     ],
   },
 ];
+
+/** Public projects with each node's definition/summary backfilled from its note. */
+export const EXAMPLE_PROJECTS: ExampleProject[] = RAW_PROJECTS.map(withNodeDetails);
