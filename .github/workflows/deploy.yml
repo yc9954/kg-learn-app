@@ -160,11 +160,11 @@ jobs:
 
       - name: Deploy via Blob Storage (bypass Kudu)
         run: |
-          # Create storage account for deployment if it doesn't exist
           STORAGE_ACCOUNT="kglearndeploysa"
           CONTAINER_NAME="deploy-packages"
           BLOB_NAME="app-$(date +%Y%m%d%H%M%S).zip"
 
+          # Create storage (idempotent) and wait for DNS
           az storage account create \
             --name "$STORAGE_ACCOUNT" \
             --resource-group "$AZURE_RESOURCE_GROUP" \
@@ -172,43 +172,54 @@ jobs:
             --sku Standard_LRS \
             --output none 2>/dev/null || true
 
+          # Get storage key (avoids auth-mode login issues)
+          STORAGE_KEY=$(az storage account keys list \
+            --account-name "$STORAGE_ACCOUNT" \
+            --resource-group "$AZURE_RESOURCE_GROUP" \
+            --query '[0].value' -o tsv)
+
+          # Wait for DNS propagation
+          for i in $(seq 1 12); do
+            nslookup "${STORAGE_ACCOUNT}.blob.core.windows.net" >/dev/null 2>&1 && break
+            echo "Waiting for DNS... ($i/12)"
+            sleep 5
+          done
+
           az storage container create \
             --name "$CONTAINER_NAME" \
             --account-name "$STORAGE_ACCOUNT" \
-            --auth-mode login \
+            --account-key "$STORAGE_KEY" \
             --output none 2>/dev/null || true
 
-          # Upload zip to blob storage
+          # Upload zip via account key
           az storage blob upload \
             --account-name "$STORAGE_ACCOUNT" \
             --container-name "$CONTAINER_NAME" \
             --name "$BLOB_NAME" \
             --file app.zip \
-            --auth-mode login \
+            --account-key "$STORAGE_KEY" \
             --overwrite \
             --output none
 
-          # Generate SAS URL (valid for 2 hours)
-          EXPIRY=$(date -u -d "+2 hours" '+%Y-%m-%dT%H:%MZ' 2>/dev/null || date -u -v+2H '+%Y-%m-%dT%H:%MZ')
+          # Generate SAS URL (valid 1 year)
+          EXPIRY=$(date -u -d "+365 days" '+%Y-%m-%dT%H:%MZ' 2>/dev/null || date -u -v+365d '+%Y-%m-%dT%H:%MZ')
           BLOB_URL=$(az storage blob generate-sas \
             --account-name "$STORAGE_ACCOUNT" \
             --container-name "$CONTAINER_NAME" \
             --name "$BLOB_NAME" \
             --permissions r \
             --expiry "$EXPIRY" \
-            --auth-mode login \
-            --as-user \
+            --account-key "$STORAGE_KEY" \
             --full-uri \
             --output tsv)
 
-          # Set WEBSITE_RUN_FROM_PACKAGE to blob URL (bypasses Kudu entirely)
+          # Point App Service at the blob (bypasses Kudu entirely)
           az webapp config appsettings set \
             --resource-group "$AZURE_RESOURCE_GROUP" \
             --name "$AZURE_WEBAPP_NAME" \
             --settings "WEBSITE_RUN_FROM_PACKAGE=$BLOB_URL" \
             --output none
 
-          # Restart to pick up the new package
           az webapp restart \
             --resource-group "$AZURE_RESOURCE_GROUP" \
             --name "$AZURE_WEBAPP_NAME"
