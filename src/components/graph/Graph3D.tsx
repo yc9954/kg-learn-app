@@ -41,6 +41,8 @@ type ForceGraphInstance = {
   width: (n: number) => ForceGraphInstance;
   height: (n: number) => ForceGraphInstance;
   cooldownTicks: (n: number) => ForceGraphInstance;
+  zoomToFit: (ms?: number, px?: number) => ForceGraphInstance;
+  onEngineStop: (fn: () => void) => ForceGraphInstance;
   onNodeClick: (fn: (n: GNode) => void) => ForceGraphInstance;
   onBackgroundClick: (fn: () => void) => ForceGraphInstance;
   _destructor?: () => void;
@@ -106,16 +108,30 @@ export default function Graph3D({
         .linkDirectionalArrowRelPos(1)
         .linkDirectionalParticles(2)
         .onNodeClick((n) => onSelectRef.current(n.id))
-        .onBackgroundClick(() => onSelectRef.current(null));
+        .onBackgroundClick(() => onSelectRef.current(null))
+        // Re-frame the camera so the whole graph stays in view (no clipping).
+        .onEngineStop(() => graph.zoomToFit(400, 50));
 
-      graph.width(containerRef.current.clientWidth);
-      graph.height(containerRef.current.clientHeight);
+      const measure = () => {
+        const el2 = containerRef.current;
+        if (!el2 || !graphRef.current) return;
+        const w = el2.clientWidth || el2.offsetWidth;
+        const h = el2.clientHeight || el2.offsetHeight;
+        if (w > 0) graphRef.current.width(w);
+        if (h > 0) graphRef.current.height(h);
+      };
+
       graphRef.current = graph;
+      measure();
+      // Container height may settle a frame later (flex/grid); re-measure + fit.
+      requestAnimationFrame(() => {
+        measure();
+        graph.zoomToFit(0, 50);
+      });
 
       const ro = new ResizeObserver(() => {
-        if (!containerRef.current || !graphRef.current) return;
-        graphRef.current.width(containerRef.current.clientWidth);
-        graphRef.current.height(containerRef.current.clientHeight);
+        measure();
+        graphRef.current?.zoomToFit(300, 50);
       });
       ro.observe(containerRef.current);
       resizeObserverRef.current = ro;
@@ -144,6 +160,12 @@ export default function Graph3D({
         .map((e: PrerequisiteEdge) => ({ source: e.from, target: e.to })),
     };
     graph.graphData(data);
+    // After the first batch lands, frame it (engine may already be stopped for
+    // small static graphs, so onEngineStop alone may not fire again).
+    if (data.nodes.length > 0) {
+      const t = setTimeout(() => graphRef.current?.zoomToFit(400, 50), 600);
+      return () => clearTimeout(t);
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [nodes, edges, selectedId, currentId, nextSet]);
 
