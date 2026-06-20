@@ -117,6 +117,30 @@
   color: var(--kg-primary-ink);
 }
 
+.exportBtn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: none;
+  cursor: pointer;
+  padding: 5px 9px;
+  margin-left: 2px;
+  border-radius: 999px;
+  background: transparent;
+  color: var(--kg-muted);
+  transition: all 0.18s ease;
+}
+
+.exportBtn:hover:not(:disabled) {
+  color: var(--kg-text);
+  background: color-mix(in srgb, var(--kg-text) 10%, transparent);
+}
+
+.exportBtn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
 /* ---- legend ------------------------------------------------------------- */
 .legend {
   position: absolute;
@@ -196,9 +220,11 @@
   position: absolute;
   top: 12px;
   right: 12px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   border: none;
   background: transparent;
-  font-size: 20px;
   line-height: 1;
   cursor: pointer;
   color: inherit;

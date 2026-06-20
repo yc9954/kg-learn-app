@@ -1,5 +1,6 @@
 import Link from "next/link";
 import type { Metadata } from "next";
+import { ArrowLeft } from "lucide-react";
 import { EXAMPLE_PROJECTS } from "@/lib/examples/projects";
 import styles from "./index.module.css";
 
@@ -13,7 +14,7 @@ export default function ExamplesIndexPage() {
   return (
     <div className={styles.shell}>
       <Link className={styles.back} href="/">
-        ← Back to home
+        <ArrowLeft size={15} aria-hidden /> Back to home
       </Link>
 
       <div className={styles.head}>

@@ -24,7 +24,7 @@
  *   selected → thick accent outline (click selection)
  */
 
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, type MutableRefObject } from "react";
 import cytoscape, {
   type Core,
   type ElementDefinition,
@@ -59,6 +59,8 @@ export type GraphCanvasProps = {
   /** Upcoming lecture targets (optional). */
   nextIds?: string[];
   className?: string;
+  /** Parent registers a PNG exporter here for the download button. */
+  exportRef?: MutableRefObject<(() => string | null) | null>;
 };
 
 export default function GraphCanvas({
@@ -70,6 +72,7 @@ export default function GraphCanvas({
   currentId = null,
   nextIds,
   className,
+  exportRef,
 }: GraphCanvasProps) {
   const containerRef = useRef<HTMLDivElement | null>(null);
   const cyRef = useRef<Core | null>(null);
@@ -108,13 +111,25 @@ export default function GraphCanvas({
       if (evt.target === cy) onSelectRef.current(null);
     });
 
+    if (exportRef) {
+      exportRef.current = () => {
+        try {
+          return cy.png({ full: true, scale: 2, bg: "#ffffff" });
+        } catch {
+          return null;
+        }
+      };
+    }
+
     return () => {
       if (layoutTimer.current) clearTimeout(layoutTimer.current);
+      if (exportRef) exportRef.current = null;
       cy.destroy();
       cyRef.current = null;
       knownNodeIds.current.clear();
       knownEdgeIds.current.clear();
     };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   // ---- incremental append + animate ---------------------------------------

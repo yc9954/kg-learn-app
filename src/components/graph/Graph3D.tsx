@@ -11,7 +11,7 @@
  * dynamically inside an effect and never on the server.
  */
 
-import { useEffect, useMemo, useRef } from "react";
+import { useEffect, useMemo, useRef, type MutableRefObject } from "react";
 import type { Concept, PrerequisiteEdge } from "@/lib/ontology/types";
 
 export type Graph3DProps = {
@@ -22,6 +22,8 @@ export type Graph3DProps = {
   currentId?: string | null;
   nextIds?: string[];
   className?: string;
+  /** Parent registers a PNG exporter here for the download button. */
+  exportRef?: MutableRefObject<(() => string | null) | null>;
 };
 
 type ForceGraphInstance = {
@@ -45,6 +47,9 @@ type ForceGraphInstance = {
   onEngineStop: (fn: () => void) => ForceGraphInstance;
   onNodeClick: (fn: (n: GNode) => void) => ForceGraphInstance;
   onBackgroundClick: (fn: () => void) => ForceGraphInstance;
+  renderer: () => { domElement: HTMLCanvasElement };
+  scene: () => unknown;
+  camera: () => unknown;
   _destructor?: () => void;
 };
 
@@ -68,6 +73,7 @@ export default function Graph3D({
   currentId = null,
   nextIds,
   className,
+  exportRef,
 }: Graph3DProps) {
   const containerRef = useRef<HTMLDivElement | null>(null);
   const graphRef = useRef<ForceGraphInstance | null>(null);
@@ -93,9 +99,15 @@ export default function Graph3D({
     (async () => {
       const mod = await import("3d-force-graph");
       if (destroyed || !containerRef.current) return;
-      const ForceGraph3D = (mod.default ?? mod) as unknown as () => ForceGraphInstance;
+      const ForceGraph3D = (mod.default ?? mod) as unknown as (
+        cfg?: Record<string, unknown>,
+      ) => (el: HTMLElement) => ForceGraphInstance;
 
-      const graph = ForceGraph3D()(containerRef.current)
+      // preserveDrawingBuffer keeps the WebGL backbuffer readable so we can
+      // export the 3D view to PNG via canvas.toDataURL().
+      const graph = ForceGraph3D({
+        rendererConfig: { antialias: true, alpha: true, preserveDrawingBuffer: true },
+      })(containerRef.current)
         .backgroundColor("rgba(0,0,0,0)")
         .nodeLabel((n) => n.name)
         .nodeColor((n) => COLORS[n.state] ?? COLORS.frontier)
@@ -123,6 +135,17 @@ export default function Graph3D({
 
       graphRef.current = graph;
       measure();
+
+      if (exportRef) {
+        exportRef.current = () => {
+          try {
+            const canvas = graph.renderer().domElement;
+            return canvas.toDataURL("image/png");
+          } catch {
+            return null;
+          }
+        };
+      }
       // Container height may settle a frame later (flex/grid); re-measure + fit.
       requestAnimationFrame(() => {
         measure();
@@ -139,6 +162,7 @@ export default function Graph3D({
 
     return () => {
       destroyed = true;
+      if (exportRef) exportRef.current = null;
       resizeObserverRef.current?.disconnect();
       graphRef.current?._destructor?.();
       graphRef.current = null;

@@ -93,6 +93,8 @@
 
 .cta {
   display: inline-flex;
+  align-items: center;
+  gap: 7px;
   align-self: flex-start;
   padding: 11px 20px;
   border-radius: 10px;

@@ -25,6 +25,10 @@
   align-items: center;
 }
 
+.emptyIcon {
+  color: var(--kg-primary);
+}
+
 .emptyTitle {
   margin: 0;
   font-size: 18px;
@@ -165,7 +169,10 @@
 }
 
 .composerSend {
-  padding: 11px 20px;
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 11px 18px;
   font-size: 14px;
   font-weight: 600;
   border-radius: 10px;

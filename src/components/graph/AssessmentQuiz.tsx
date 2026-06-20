@@ -12,7 +12,10 @@
  */
 
 import { useCallback, useEffect, useRef, useState } from "react";
+import * as Dialog from "@radix-ui/react-dialog";
+import { Loader2, X } from "lucide-react";
 import type { AssessmentQuestion, UserLevel } from "@/lib/ontology/types";
+import Progress from "@/components/ui/Progress";
 import styles from "./assessment.module.css";
 
 type StepResponse = {
@@ -119,62 +122,76 @@ export default function AssessmentQuiz({
   }, [begin]);
 
   return (
-    <div className={styles.overlay} role="dialog" aria-modal="true" aria-label="Level check">
-      <div className={styles.card}>
-        <div className={styles.head}>
-          <div>
-            <span className={styles.kicker}>Quick level check</span>
-            <h2 className={styles.title}>Before your lectures on {topic || "this topic"}</h2>
-            <p className={styles.sub}>
-              A few quick questions so your lectures start at the right depth and
-              skip what you already know. This is required before notes are built.
-            </p>
-          </div>
-          <button className={styles.close} onClick={onCancel} aria-label="Cancel">
-            ×
-          </button>
-        </div>
-
-        {error && <p className={styles.error}>{error}</p>}
-
-        {submitting ? (
-          <div className={styles.loading}>
-            <span className={styles.spinner} aria-hidden />
-            <span>Scoring your answers and tailoring the lectures…</span>
-          </div>
-        ) : question ? (
-          <div className={styles.qBlock}>
-            <div className={styles.qMeta}>
-              <span className={styles.qNum}>Question {answered + 1}</span>
-              <span className={styles.diff} data-diff={question.difficulty}>
-                {question.difficulty}
-              </span>
+    <Dialog.Root
+      open
+      onOpenChange={(o) => {
+        if (!o) onCancel();
+      }}
+    >
+      <Dialog.Portal>
+        <Dialog.Overlay className={styles.overlay} />
+        <Dialog.Content className={styles.card} aria-label="Level check">
+          <div className={styles.head}>
+            <div>
+              <span className={styles.kicker}>Quick level check</span>
+              <Dialog.Title className={styles.title}>
+                Before your lectures on {topic || "this topic"}
+              </Dialog.Title>
+              <Dialog.Description className={styles.sub}>
+                A few quick questions so your lectures start at the right depth and
+                skip what you already know. This is required before notes are built.
+              </Dialog.Description>
             </div>
-            <p className={styles.qText}>{question.text}</p>
-            <div className={styles.options}>
-              {question.options.map((opt, i) => (
-                <button
-                  key={i}
-                  type="button"
-                  className={styles.option}
-                  disabled={busy}
-                  onClick={() => choose(i)}
-                >
-                  <span className={styles.optLetter}>
-                    {String.fromCharCode(65 + i)}
-                  </span>
-                  <span>{opt}</span>
-                </button>
-              ))}
+            <Dialog.Close className={styles.close} aria-label="Cancel">
+              <X size={18} aria-hidden />
+            </Dialog.Close>
+          </div>
+
+          <div className={styles.progressWrap}>
+            <Progress value={Math.min((answered / 5) * 100, 100)} />
+          </div>
+
+          {error && <p className={styles.error}>{error}</p>}
+
+          {submitting ? (
+            <div className={styles.loading}>
+              <Loader2 className={styles.spinner} size={20} aria-hidden />
+              <span>Scoring your answers and tailoring the lectures…</span>
             </div>
-          </div>
-        ) : (
-          <div className={styles.loading}>
-            <span className={styles.spinner} aria-hidden />
-            <span>Preparing your level check…</span>
-          </div>
-        )}
-      </div>
-    </div>
+          ) : question ? (
+            <div className={styles.qBlock}>
+              <div className={styles.qMeta}>
+                <span className={styles.qNum}>Question {answered + 1}</span>
+                <span className={styles.diff} data-diff={question.difficulty}>
+                  {question.difficulty}
+                </span>
+              </div>
+              <p className={styles.qText}>{question.text}</p>
+              <div className={styles.options}>
+                {question.options.map((opt, i) => (
+                  <button
+                    key={i}
+                    type="button"
+                    className={styles.option}
+                    disabled={busy}
+                    onClick={() => choose(i)}
+                  >
+                    <span className={styles.optLetter}>
+                      {String.fromCharCode(65 + i)}
+                    </span>
+                    <span>{opt}</span>
+                  </button>
+                ))}
+              </div>
+            </div>
+          ) : (
+            <div className={styles.loading}>
+              <Loader2 className={styles.spinner} size={20} aria-hidden />
+              <span>Preparing your level check…</span>
+            </div>
+          )}
+        </Dialog.Content>
+      </Dialog.Portal>
+    </Dialog.Root>
   );
 }

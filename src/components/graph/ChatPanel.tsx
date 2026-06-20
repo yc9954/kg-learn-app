@@ -9,6 +9,7 @@
  */
 
 import { useEffect, useRef, useState } from "react";
+import { Send, Sparkles } from "lucide-react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import remarkMath from "remark-math";
@@ -87,6 +88,7 @@ export default function ChatPanel({ topic }: { topic?: string | null }) {
       <div className={styles.scroll} ref={scrollRef}>
         {empty ? (
           <div className={styles.empty}>
+            <Sparkles className={styles.emptyIcon} size={26} aria-hidden />
             <h3 className={styles.emptyTitle}>Talk to your study assistant</h3>
             <p className={styles.emptyText}>
               {topic
@@ -146,8 +148,14 @@ export default function ChatPanel({ topic }: { topic?: string | null }) {
           aria-label="Chat message"
           disabled={busy}
         />
-        <button className={styles.composerSend} type="submit" disabled={busy || !input.trim()}>
-          {busy ? "…" : "Send"}
+        <button
+          className={styles.composerSend}
+          type="submit"
+          disabled={busy || !input.trim()}
+          aria-label="Send message"
+        >
+          <Send size={16} aria-hidden />
+          <span>Send</span>
         </button>
       </form>
     </div>

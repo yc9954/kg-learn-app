@@ -190,8 +190,9 @@
 }
 
 .featureIcon {
-  font-size: 11px;
-  opacity: 0.85;
+  color: var(--kg-primary);
+  opacity: 0.95;
+  flex: 0 0 auto;
 }
 
 .loginPane {
@@ -282,6 +283,9 @@
 }
 
 .authButton {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
   padding: 8px 12px;
   font-size: 13px;
   border-radius: 8px;
@@ -449,6 +453,9 @@
 }
 
 .chatTitle {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
   font-size: 15px;
   font-weight: 800;
   color: var(--kg-text);
@@ -556,6 +563,9 @@
 
 .backToGraph {
   align-self: flex-start;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
   margin-bottom: 12px;
   padding: 8px 14px;
   font-size: 13px;
@@ -661,22 +671,7 @@
 }
 
 .progressTrack {
-  height: 8px;
-  border-radius: 999px;
-  background: var(--kg-surface-2);
-  border: 1px solid var(--kg-border);
-  overflow: hidden;
-}
-
-.progressFill {
-  height: 100%;
-  border-radius: 999px;
-  background: linear-gradient(
-    90deg,
-    var(--kg-primary),
-    var(--kg-primary-strong)
-  );
-  transition: width 0.5s cubic-bezier(0.22, 1, 0.36, 1);
+  margin-top: 2px;
 }
 
 .progressPct {
@@ -690,6 +685,10 @@
 .generateBtn {
   margin-top: 14px;
   width: 100%;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
   padding: 11px 16px;
   font-size: 14px;
   font-weight: 700;

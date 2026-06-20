@@ -9,10 +9,23 @@
 
 import { useState } from "react";
 import { signIn, signOut, useSession } from "next-auth/react";
+import {
+  ArrowLeft,
+  ArrowRight,
+  Gauge,
+  GraduationCap,
+  LayoutGrid,
+  LogOut,
+  MessagesSquare,
+  Network,
+  Sparkles,
+  Trophy,
+} from "lucide-react";
 import GraphView, { type GraphStats } from "@/components/graph/GraphView";
 import LecturePanel, { type LectureProgress } from "@/components/graph/LecturePanel";
 import ChatPanel from "@/components/graph/ChatPanel";
 import AssessmentQuiz from "@/components/graph/AssessmentQuiz";
+import Progress from "@/components/ui/Progress";
 import { EXAMPLE_PROJECTS } from "@/lib/examples/projects";
 import styles from "./learn.module.css";
 
@@ -124,15 +137,15 @@ export default function LearnExperience() {
             </p>
             <ul className={styles.featureList}>
               <li className={styles.featureItem}>
-                <span className={styles.featureIcon}>◆</span>
+                <Network className={styles.featureIcon} size={18} aria-hidden />
                 Live-growing prerequisite graph
               </li>
               <li className={styles.featureItem}>
-                <span className={styles.featureIcon}>◆</span>
+                <Gauge className={styles.featureIcon} size={18} aria-hidden />
                 Adaptive level assessment
               </li>
               <li className={styles.featureItem}>
-                <span className={styles.featureIcon}>◆</span>
+                <GraduationCap className={styles.featureIcon} size={18} aria-hidden />
                 Topologically-ordered lectures
               </li>
             </ul>
@@ -214,12 +227,16 @@ export default function LearnExperience() {
             className={mode === "lectures" ? styles.navItem : styles.navItemActive}
             onClick={backToGraph}
           >
-            <span className={styles.navIcon}>◈</span>
+            <Network className={styles.navIcon} size={18} aria-hidden />
             Graph &amp; Chat
           </button>
           <a className={styles.navItem} href="/examples">
-            <span className={styles.navIcon}>❖</span>
+            <LayoutGrid className={styles.navIcon} size={18} aria-hidden />
             Examples
+          </a>
+          <a className={styles.navItem} href="/leaderboard">
+            <Trophy className={styles.navIcon} size={18} aria-hidden />
+            Leaderboard
           </a>
         </nav>
 
@@ -232,7 +249,7 @@ export default function LearnExperience() {
             type="button"
             onClick={() => signOut({ callbackUrl: "/" })}
           >
-            Log out
+            <LogOut size={15} aria-hidden /> Log out
           </button>
         </div>
       </aside>
@@ -280,7 +297,7 @@ export default function LearnExperience() {
         {mode === "lectures" ? (
           <div className={styles.panel}>
             <button type="button" className={styles.backToGraph} onClick={backToGraph}>
-              ← Back to graph &amp; chat
+              <ArrowLeft size={15} aria-hidden /> Back to graph &amp; chat
             </button>
             <LecturePanel
               sessionId={sessionId}
@@ -308,7 +325,9 @@ export default function LearnExperience() {
             </div>
             <aside className={styles.workspaceChat}>
               <div className={styles.chatHeader}>
-                <span className={styles.chatTitle}>✦ Study assistant</span>
+                <span className={styles.chatTitle}>
+                  <MessagesSquare size={17} aria-hidden /> Study assistant
+                </span>
                 <span className={styles.chatHint}>Ask anything about your topic</span>
               </div>
               <div className={styles.chatHost}>
@@ -386,8 +405,8 @@ function StatusCard({
         </div>
       </div>
 
-      <div className={styles.progressTrack} aria-hidden>
-        <div className={styles.progressFill} style={{ width: `${pct}%` }} />
+      <div className={styles.progressTrack}>
+        <Progress value={pct} tone={pct >= 100 ? "success" : "primary"} />
       </div>
       <span className={styles.progressPct}>{pct}% mastered</span>
 
@@ -397,7 +416,8 @@ function StatusCard({
         onClick={onGenerate}
         disabled={!canGenerate}
       >
-        Generate lecture notes →
+        <Sparkles size={16} aria-hidden /> Generate lecture notes
+        <ArrowRight size={16} aria-hidden />
       </button>
     </div>
   );

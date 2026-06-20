@@ -19,8 +19,24 @@
 
 .meta {
   display: flex;
-  align-items: baseline;
+  align-items: center;
   gap: 0.6rem;
+}
+
+.metaTitle {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+}
+
+.spin {
+  animation: spin 0.8s linear infinite;
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
 }
 
 .progress {
@@ -35,6 +51,9 @@
 
 .primary,
 .ghost {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
   font: inherit;
   font-size: 0.9rem;
   font-weight: 600;

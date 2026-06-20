@@ -16,8 +16,10 @@
  * Passing neither renders a clean empty state (the initial UI).
  */
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import dynamic from "next/dynamic";
+import { Download, X } from "lucide-react";
+import { toast } from "sonner";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import remarkMath from "remark-math";
@@ -65,6 +67,22 @@ export default function GraphView({
   );
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [view, setView] = useState<ViewMode>("3d");
+  const exportRef = useRef<(() => string | null) | null>(null);
+
+  function downloadPng() {
+    const url = exportRef.current?.();
+    if (!url) {
+      toast.error("Couldn't export the graph. Try the other view (2D/3D).");
+      return;
+    }
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `knowledge-graph-${view}.png`;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    toast.success("Graph image downloaded");
+  }
 
   const knownCount = useMemo(
     () => nodes.filter((n) => n.known).length,
@@ -93,6 +111,7 @@ export default function GraphView({
           onSelect={setSelectedId}
           currentId={currentId}
           nextIds={nextIds}
+          exportRef={exportRef}
         />
       ) : (
         <GraphCanvas
@@ -104,6 +123,7 @@ export default function GraphView({
           onSelect={setSelectedId}
           currentId={currentId}
           nextIds={nextIds}
+          exportRef={exportRef}
         />
       )}
 
@@ -121,6 +141,16 @@ export default function GraphView({
           onClick={() => setView("3d")}
         >
           3D
+        </button>
+        <button
+          type="button"
+          className={styles.exportBtn}
+          onClick={downloadPng}
+          disabled={isEmpty}
+          title="Download graph as PNG"
+          aria-label="Download graph as PNG"
+        >
+          <Download size={15} aria-hidden />
         </button>
       </div>
 
@@ -233,7 +263,7 @@ function DetailPanel({
   return (
     <aside className={styles.panel} role="dialog" aria-label={concept.name}>
       <button className={styles.panelClose} onClick={onClose} aria-label="Close">
-        ×
+        <X size={16} aria-hidden />
       </button>
       <h2 className={styles.panelTitle}>{concept.name}</h2>
       {concept.known && <span className={styles.panelTag}>already known</span>}

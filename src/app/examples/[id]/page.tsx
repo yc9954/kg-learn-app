@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import type { Metadata } from "next";
+import { ArrowLeft, ArrowRight } from "lucide-react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import remarkMath from "remark-math";
@@ -39,7 +40,7 @@ export default async function ExamplePage({
   return (
     <div className={styles.shell}>
       <Link className={styles.back} href="/">
-        ← Back to home
+        <ArrowLeft size={15} aria-hidden /> Back to home
       </Link>
 
       <div className={styles.head}>
@@ -98,7 +99,7 @@ export default async function ExamplePage({
       </div>
 
       <Link className={styles.cta} href="/">
-        Build your own graph →
+        Build your own graph <ArrowRight size={16} aria-hidden />
       </Link>
     </div>
   );

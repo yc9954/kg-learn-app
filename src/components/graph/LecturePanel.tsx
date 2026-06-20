@@ -10,6 +10,7 @@
  */
 
 import { useCallback, useEffect, useState } from "react";
+import { ArrowRight, BookOpen, Loader2, RotateCcw } from "lucide-react";
 import type { Lecture } from "@/lib/ontology/types";
 import LectureView from "@/components/Lecture";
 import styles from "./lecture.module.css";
@@ -106,7 +107,9 @@ export default function LecturePanel({
     <section className={styles.panel} aria-label="Lecture">
       <div className={styles.bar}>
         <div className={styles.meta}>
-          <strong>Lectures</strong>
+          <strong className={styles.metaTitle}>
+            <BookOpen size={17} aria-hidden /> Lectures
+          </strong>
           {total > 0 && (
             <span className={styles.progress}>
               {done ? `done · ${total}/${total}` : `${Math.max(position, 0)}/${total}`}
@@ -116,19 +119,35 @@ export default function LecturePanel({
         <div className={styles.actions}>
           {!started ? (
             <button className={styles.primary} onClick={() => call("teach")} disabled={busy}>
-              {busy ? "Preparing…" : "Teach me"}
+              {busy ? (
+                <>
+                  <Loader2 className={styles.spin} size={15} aria-hidden /> Preparing…
+                </>
+              ) : (
+                <>
+                  <BookOpen size={15} aria-hidden /> Teach me
+                </>
+              )}
             </button>
           ) : done ? (
             <button className={styles.ghost} onClick={() => call("restart")} disabled={busy}>
-              Restart
+              <RotateCcw size={15} aria-hidden /> Restart
             </button>
           ) : (
             <>
               <button className={styles.ghost} onClick={() => call("restart")} disabled={busy}>
-                Restart
+                <RotateCcw size={15} aria-hidden /> Restart
               </button>
               <button className={styles.primary} onClick={() => call("next")} disabled={busy}>
-                {busy ? "Generating…" : "Next concept →"}
+                {busy ? (
+                  <>
+                    <Loader2 className={styles.spin} size={15} aria-hidden /> Generating…
+                  </>
+                ) : (
+                  <>
+                    Next concept <ArrowRight size={15} aria-hidden />
+                  </>
+                )}
               </button>
             </>
           )}
