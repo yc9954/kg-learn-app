@@ -9,7 +9,7 @@
 
 import { useState } from "react";
 import { signIn, signOut, useSession } from "next-auth/react";
-import GraphView from "@/components/graph/GraphView";
+import GraphView, { type GraphStats } from "@/components/graph/GraphView";
 import LecturePanel, { type LectureProgress } from "@/components/graph/LecturePanel";
 import ChatPanel from "@/components/graph/ChatPanel";
 import { EXAMPLE_PROJECTS } from "@/lib/examples/projects";
@@ -41,7 +41,8 @@ export default function LearnExperience() {
   const [starting, setStarting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [progress, setProgress] = useState<LectureProgress | null>(null);
-  const [activeTab, setActiveTab] = useState<"graph" | "lectures" | "chat">("graph");
+  const [activeTab, setActiveTab] = useState<"graph" | "lectures">("graph");
+  const [graphStats, setGraphStats] = useState<GraphStats | null>(null);
 
   async function start(e: React.FormEvent) {
     e.preventDefault();
@@ -199,14 +200,6 @@ export default function LearnExperience() {
             <span className={styles.navIcon}>▤</span>
             Lectures
           </button>
-          <button
-            type="button"
-            className={activeTab === "chat" ? styles.navItemActive : styles.navItem}
-            onClick={() => setActiveTab("chat")}
-          >
-            <span className={styles.navIcon}>✦</span>
-            Chat
-          </button>
           <a className={styles.navItem} href="/examples/transformers">
             <span className={styles.navIcon}>❖</span>
             Examples
@@ -230,11 +223,7 @@ export default function LearnExperience() {
       <main className={styles.main}>
         <header className={styles.header}>
           <h1 className={styles.pageTitle}>
-            {activeTab === "graph"
-              ? "Knowledge Graph"
-              : activeTab === "lectures"
-                ? "Lectures"
-                : "Study Assistant"}
+            {activeTab === "graph" ? "Knowledge Graph" : "Lectures"}
           </h1>
           <p className={styles.subtitle}>
             Enter a topic and watch its prerequisite graph build itself, live.
@@ -255,22 +244,88 @@ export default function LearnExperience() {
           {error && <p className={styles.error}>{error}</p>}
         </header>
 
-        <div className={styles.panel}>
-          {activeTab === "graph" ? (
-            <div className={styles.graph}>
+        {activeTab === "graph" ? (
+          <div className={styles.workspaceSplit}>
+            <div className={styles.workspaceGraph}>
               <GraphView
                 sessionId={sessionId}
                 currentId={progress?.currentNodeId ?? null}
                 nextIds={progress?.nextIds}
+                onStats={setGraphStats}
               />
             </div>
-          ) : activeTab === "lectures" ? (
+            <aside className={styles.workspaceChat}>
+              <StatusCard topic={topic.trim()} stats={graphStats} />
+              <div className={styles.chatHost}>
+                <ChatPanel topic={topic.trim() || null} />
+              </div>
+            </aside>
+          </div>
+        ) : (
+          <div className={styles.panel}>
             <LecturePanel sessionId={sessionId} onProgress={setProgress} />
-          ) : (
-            <ChatPanel topic={topic.trim() || null} />
-          )}
-        </div>
+          </div>
+        )}
       </main>
+    </div>
+  );
+}
+
+function StatusCard({
+  topic,
+  stats,
+}: {
+  topic: string;
+  stats: GraphStats | null;
+}) {
+  const total = stats?.total ?? 0;
+  const known = stats?.known ?? 0;
+  const remaining = Math.max(total - known, 0);
+  const pct = total > 0 ? Math.round((known / total) * 100) : 0;
+  const phase = stats?.status ?? "idle";
+
+  const phaseLabel =
+    phase === "researching"
+      ? "Building graph…"
+      : phase === "converged"
+        ? "Graph ready"
+        : phase === "stopped"
+          ? "Stopped"
+          : "Idle";
+
+  return (
+    <div className={styles.statusCard}>
+      <div className={styles.statusHead}>
+        <span className={styles.statusLabel}>Your progress</span>
+        <span
+          className={styles.statusPhase}
+          data-phase={phase === "researching" ? "live" : "still"}
+        >
+          {phaseLabel}
+        </span>
+      </div>
+
+      <p className={styles.statusTopic}>{topic || "No topic yet"}</p>
+
+      <div className={styles.statRow}>
+        <div className={styles.stat}>
+          <span className={styles.statNum}>{total}</span>
+          <span className={styles.statKey}>concepts</span>
+        </div>
+        <div className={styles.stat}>
+          <span className={styles.statNum}>{known}</span>
+          <span className={styles.statKey}>known</span>
+        </div>
+        <div className={styles.stat}>
+          <span className={styles.statNum}>{remaining}</span>
+          <span className={styles.statKey}>to learn</span>
+        </div>
+      </div>
+
+      <div className={styles.progressTrack} aria-hidden>
+        <div className={styles.progressFill} style={{ width: `${pct}%` }} />
+      </div>
+      <span className={styles.progressPct}>{pct}% mastered</span>
     </div>
   );
 }

@@ -16,7 +16,7 @@
  * Passing neither renders a clean empty state (the initial UI).
  */
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import dynamic from "next/dynamic";
 import type { Concept, KnowledgeGraph } from "@/lib/ontology/types";
 import { useGraphStream } from "@/lib/graph/useGraphStream";
@@ -27,6 +27,13 @@ const Graph3D = dynamic(() => import("./Graph3D"), { ssr: false });
 
 type ViewMode = "2d" | "3d";
 
+export type GraphStats = {
+  total: number;
+  known: number;
+  edges: number;
+  status: string;
+};
+
 export type GraphViewProps = {
   /** Live research session id from `POST /api/research`. */
   sessionId?: string | null;
@@ -36,6 +43,8 @@ export type GraphViewProps = {
   currentId?: string | null;
   /** Upcoming lecture targets (optional). */
   nextIds?: string[];
+  /** Reports live graph stats to a parent (status panel, etc.). */
+  onStats?: (s: GraphStats) => void;
 };
 
 export default function GraphView({
@@ -43,6 +52,7 @@ export default function GraphView({
   graph,
   currentId = null,
   nextIds,
+  onStats,
 }: GraphViewProps) {
   const { nodes, edges, status, error, connection, eventCount } = useGraphStream(
     sessionId ?? null,
@@ -50,6 +60,15 @@ export default function GraphView({
   );
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [view, setView] = useState<ViewMode>("3d");
+
+  const knownCount = useMemo(
+    () => nodes.filter((n) => n.known).length,
+    [nodes],
+  );
+
+  useEffect(() => {
+    onStats?.({ total: nodes.length, known: knownCount, edges: edges.length, status });
+  }, [nodes.length, knownCount, edges.length, status, onStats]);
 
   const selected: Concept | undefined = useMemo(
     () => nodes.find((n) => n.id === selectedId),
