@@ -172,10 +172,99 @@
 
 .noteBody {
   font-size: 14px;
-  line-height: 1.6;
+  line-height: 1.65;
   color: var(--kg-text);
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
 }
 
 .noteBody :global(p) {
   margin: 0;
+}
+
+.noteBody :global(ul),
+.noteBody :global(ol) {
+  margin: 0;
+  padding-left: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.noteBody :global(.katex-display) {
+  margin: 4px 0;
+  overflow-x: auto;
+  overflow-y: hidden;
+  padding: 2px 0;
+}
+
+.noteBody :global(em) {
+  color: var(--kg-muted);
+}
+
+/* ---- research report ---------------------------------------------------- */
+.report {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.reportBody {
+  margin-top: 4px;
+  padding: 20px 22px;
+  border: 1px solid var(--kg-border);
+  border-radius: 16px;
+  background: var(--kg-surface);
+  box-shadow: 0 4px 6px -1px color-mix(in srgb, black 8%, transparent);
+  font-size: 14px;
+  line-height: 1.65;
+  color: var(--kg-text);
+}
+
+.reportBody :global(h2) {
+  margin: 0 0 6px;
+  font-size: 20px;
+  font-weight: 700;
+}
+
+.reportBody :global(h3) {
+  margin: 18px 0 6px;
+  font-size: 16px;
+  font-weight: 700;
+  color: var(--kg-primary);
+}
+
+.reportBody :global(p) {
+  margin: 0 0 10px;
+}
+
+.reportBody :global(ol),
+.reportBody :global(ul) {
+  margin: 0 0 10px;
+  padding-left: 22px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.reportBody :global(.katex-display) {
+  margin: 8px 0;
+  overflow-x: auto;
+  overflow-y: hidden;
+  padding: 2px 0;
+}
+
+.reportBody :global(pre) {
+  margin: 10px 0;
+  padding: 14px 16px;
+  border-radius: 12px;
+  background: color-mix(in srgb, var(--kg-text) 5%, transparent);
+  overflow-x: auto;
+  font-size: 12.5px;
+  line-height: 1.5;
+}
+
+.reportBody :global(code) {
+  font-size: 12.5px;
 }

@@ -8,6 +8,7 @@ import remarkMath from "remark-math";
 import rehypeKatex from "rehype-katex";
 import "katex/dist/katex.min.css";
 import GraphView from "@/components/graph/GraphView";
+import LectureView from "@/components/Lecture";
 import { EXAMPLE_PROJECTS } from "@/lib/examples/projects";
 import styles from "./examples.module.css";
 
@@ -60,10 +61,29 @@ export default async function ExamplePage({
         />
       </div>
 
+      <section className={styles.report}>
+        <h2 className={styles.notesHead}>Research report</h2>
+        <p className={styles.notesSub}>
+          The completed write-up this project produced — overview, prerequisite
+          structure, and key results.
+        </p>
+        <div className={styles.reportBody}>
+          <LectureView
+            lecture={{
+              id: `${ex.id}-report`,
+              conceptId: ex.id,
+              order: 0,
+              markdown: ex.report,
+            }}
+          />
+        </div>
+      </section>
+
       <section className={styles.notes}>
         <h2 className={styles.notesHead}>Lecture notes</h2>
         <p className={styles.notesSub}>
-          Taught in prerequisite order — each note builds only on the ones above it.
+          Full notes taught in prerequisite order — each builds only on the ones
+          above it.
         </p>
         <ol className={styles.noteList}>
           {ex.notes.map((n, i) => (
