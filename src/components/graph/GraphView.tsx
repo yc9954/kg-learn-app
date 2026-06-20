@@ -49,7 +49,7 @@ export default function GraphView({
     graph,
   );
   const [selectedId, setSelectedId] = useState<string | null>(null);
-  const [view, setView] = useState<ViewMode>("2d");
+  const [view, setView] = useState<ViewMode>("3d");
 
   const selected: Concept | undefined = useMemo(
     () => nodes.find((n) => n.id === selectedId),

@@ -11,6 +11,7 @@ import { useState } from "react";
 import { signIn, signOut, useSession } from "next-auth/react";
 import GraphView from "@/components/graph/GraphView";
 import LecturePanel, { type LectureProgress } from "@/components/graph/LecturePanel";
+import ChatPanel from "@/components/graph/ChatPanel";
 import { EXAMPLE_PROJECTS } from "@/lib/examples/projects";
 import styles from "./learn.module.css";
 
@@ -40,7 +41,7 @@ export default function LearnExperience() {
   const [starting, setStarting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [progress, setProgress] = useState<LectureProgress | null>(null);
-  const [activeTab, setActiveTab] = useState<"graph" | "lectures">("graph");
+  const [activeTab, setActiveTab] = useState<"graph" | "lectures" | "chat">("graph");
 
   async function start(e: React.FormEvent) {
     e.preventDefault();
@@ -198,6 +199,14 @@ export default function LearnExperience() {
             <span className={styles.navIcon}>▤</span>
             Lectures
           </button>
+          <button
+            type="button"
+            className={activeTab === "chat" ? styles.navItemActive : styles.navItem}
+            onClick={() => setActiveTab("chat")}
+          >
+            <span className={styles.navIcon}>✦</span>
+            Chat
+          </button>
           <a className={styles.navItem} href="/examples/transformers">
             <span className={styles.navIcon}>❖</span>
             Examples
@@ -221,7 +230,11 @@ export default function LearnExperience() {
       <main className={styles.main}>
         <header className={styles.header}>
           <h1 className={styles.pageTitle}>
-            {activeTab === "graph" ? "Knowledge Graph" : "Lectures"}
+            {activeTab === "graph"
+              ? "Knowledge Graph"
+              : activeTab === "lectures"
+                ? "Lectures"
+                : "Study Assistant"}
           </h1>
           <p className={styles.subtitle}>
             Enter a topic and watch its prerequisite graph build itself, live.
@@ -251,8 +264,10 @@ export default function LearnExperience() {
                 nextIds={progress?.nextIds}
               />
             </div>
-          ) : (
+          ) : activeTab === "lectures" ? (
             <LecturePanel sessionId={sessionId} onProgress={setProgress} />
+          ) : (
+            <ChatPanel topic={topic.trim() || null} />
           )}
         </div>
       </main>

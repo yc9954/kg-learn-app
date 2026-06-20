@@ -1,6 +1,11 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import type { Metadata } from "next";
+import ReactMarkdown from "react-markdown";
+import remarkGfm from "remark-gfm";
+import remarkMath from "remark-math";
+import rehypeKatex from "rehype-katex";
+import "katex/dist/katex.min.css";
 import GraphView from "@/components/graph/GraphView";
 import { EXAMPLE_PROJECTS } from "@/lib/examples/projects";
 import styles from "./examples.module.css";
@@ -53,6 +58,31 @@ export default async function ExamplePage({
           }}
         />
       </div>
+
+      <section className={styles.notes}>
+        <h2 className={styles.notesHead}>Lecture notes</h2>
+        <p className={styles.notesSub}>
+          Taught in prerequisite order — each note builds only on the ones above it.
+        </p>
+        <ol className={styles.noteList}>
+          {ex.notes.map((n, i) => (
+            <li key={n.conceptId} className={styles.noteCard}>
+              <div className={styles.noteHead}>
+                <span className={styles.noteNum}>{i + 1}</span>
+                <h3 className={styles.noteTitle}>{n.title}</h3>
+              </div>
+              <div className={styles.noteBody}>
+                <ReactMarkdown
+                  remarkPlugins={[remarkGfm, remarkMath]}
+                  rehypePlugins={[rehypeKatex]}
+                >
+                  {n.markdown}
+                </ReactMarkdown>
+              </div>
+            </li>
+          ))}
+        </ol>
+      </section>
 
       <div className={styles.others}>
         <span className={styles.othersLabel}>More examples:</span>
